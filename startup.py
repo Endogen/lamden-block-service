@@ -22,14 +22,11 @@ from timeit import default_timer as timer
 class BlockGrabber:
     cfg = None
     wst = None
-    run = None
 
     def __init__(self, config: Config):
         self.cfg = config
 
-        run = True
-
-        while run:
+        while True:
             ws = websocket.WebSocketApp(self.cfg.get('wss_masternode'),
                 on_message=lambda ws, msg: self.on_message(ws, msg),
                 on_error=lambda ws, msg: self.on_error(ws, msg),
