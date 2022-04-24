@@ -44,7 +44,7 @@ class BlockGrabber:
                 rel.signal(2, rel.abort)
                 rel.dispatch()
             except Exception as e:
-                logger.error(f'Websocket connection error: {e}')
+                logger.exception(f'Websocket connection error: {e}')
                 gc.collect()
 
             wait_secs = self.cfg.get('reconnect_after')
@@ -172,7 +172,7 @@ class BlockGrabber:
                 return block
 
         except Exception as e:
-            logger.error(f'get_block({block_num}) --> {e}')
+            logger.exception(f'get_block({block_num}) --> {e}')
             return None
 
     def check_block_files(self):
@@ -199,6 +199,7 @@ if __name__ == "__main__":
         os.path.join('log', '{time}.log'),
         format='{time} {name} {message}',
         level=cfg.get('log_level'),
-        rotation='1 MB')
+        rotation='1 MB',
+        diagnose=True)
 
     BlockGrabber(cfg)
