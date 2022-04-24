@@ -1,7 +1,10 @@
+import gc
 import os
 import pathlib
 import string
 import random
+import time
+
 import rel
 import json
 import websocket
@@ -27,18 +30,26 @@ class BlockGrabber:
         self.cfg = config
 
         while True:
-            ws = websocket.WebSocketApp(self.cfg.get('wss_masternode'),
-                on_message=lambda ws, msg: self.on_message(ws, msg),
-                on_error=lambda ws, msg: self.on_error(ws, msg),
-                on_close=lambda ws, code, msg: self.on_close(ws, code, msg),
-                on_open=lambda ws: self.on_open(ws))
+            try:
+                ws = websocket.WebSocketApp(self.cfg.get('wss_masternode'),
+                    on_message=lambda ws, msg: self.on_message(ws, msg),
+                    on_error=lambda ws, msg: self.on_error(ws, msg),
+                    on_close=lambda ws, code, msg: self.on_close(ws, code, msg),
+                    on_open=lambda ws: self.on_open(ws))
 
-            self.wst = Thread(target=ws.run_forever, kwargs={'dispatcher': rel})
-            self.wst.daemon = True
-            self.wst.start()
+                self.wst = Thread(target=ws.run_forever, kwargs={'dispatcher': rel})
+                self.wst.daemon = True
+                self.wst.start()
 
-            rel.signal(2, rel.abort)
-            rel.dispatch()
+                rel.signal(2, rel.abort)
+                rel.dispatch()
+            except Exception as e:
+                logger.error(f'Websocket connection error: {e}')
+                gc.collect()
+
+            wait_secs = self.cfg.get('reconnect_after')
+            logger.debug(f'Reconnecting after {wait_secs} seconds')
+            time.sleep(wait_secs)
 
     def decode_event(self, message: str) -> (str, str):
         event = json.loads(message)
