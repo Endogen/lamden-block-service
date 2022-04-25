@@ -15,14 +15,12 @@ from timeit import default_timer as timer
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: missing blocks, non-existing blocks all need to be stored in DB to not accidentally overwrite
-#  some unrelated data in config file
+# TODO: Store blocks_missing, blocks_non_existing in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
-# TODO: Add another job 'consistancy_check' to check for entire block space excluding 'non_existing_blocks'
-#  With option to check also 'non_existing_blocks'
-# TODO: Global state zusammenbauen
-# TODO: Endpunkte ähnlich wie bei BlockService
-# TODO: Import von Blocks erlauben
+# TODO: Job 'consistancy_check' to check for entire block space excluding & including 'non_existing_blocks'
+# TODO: Offer to generate global state
+# TODO: Use similar API to BlockService
+# TODO: Allow importing blocks via file, GitHub
 class BlockGrabber:
     cfg = None
     wst = None
@@ -78,7 +76,6 @@ class BlockGrabber:
 
     def on_message(self, ws, message):
         logger.debug(f'New event --> {message}')
-
         event, block = self.decode_event(message)
 
         if event == 'latest_block':
@@ -97,6 +94,8 @@ class BlockGrabber:
 
     def process_block(self, content: dict):
         start_time = timer()
+
+        self.cfg.set('block_latest', content['number'])
 
         self.save_block_in_db(content)
 
@@ -120,7 +119,6 @@ class BlockGrabber:
             json.dump(content, f, sort_keys=True, indent=4)
             logger.debug(f'Saved block {block_num} to file')
 
-    # TODO: We need to somehow somewhere set the new block_latest
     def sync_blocks(self, start: int = None, end: int = None):
         start_time = timer()
 
@@ -138,17 +136,21 @@ class BlockGrabber:
         to_sync.sort(key=int)
         missing = list()
 
+        non_existing = self.cfg.get('blocks_non_existing')
+        logger.debug(f'Non-existing blocks: {non_existing}')
+
         block_dir = self.cfg.get('save_to_dir')
         sleep_for = self.cfg.get('block_sync_wait')
 
         for block_num in to_sync:
             logger.debug(f'Checking block {block_num}...')
 
-            # TODO: Check block data in DB
-            #  If not present: self.save_block_in_db()
+            # TODO: Check block data in DB - If not present: self.save_block_in_db()
 
             if block_dir:
-                if not Path(os.path.join(block_dir, f'{block_num}.json')).is_file():
+                if Path(os.path.join(block_dir, f'{block_num}.json')).is_file():
+                    logger.debug(f'Block {block_num} already exists')
+                else:
                     logger.warning(f'No file for block {block_num} in {block_dir}')
 
                     time.sleep(sleep_for)
@@ -158,15 +160,21 @@ class BlockGrabber:
                         missing.append(block_num)
                         continue
                     if 'error' in block:
-                        # TODO: Add to blocks_non_existing
+                        if block['error'] == 'Block not found.':
+                            non_existing.append(block_num)
+                        else:
+                            missing.append(block_num)
                         continue
 
                     self.process_block(block)
 
+        # TODO: Once data is stored in DB, set directly after each block
         self.cfg.set('block_current', end)
         self.cfg.set('blocks_missing', missing)
+        self.cfg.set('blocks_non_existing', non_existing)
 
         logger.warning(f'Missing blocks: {missing}')
+        logger.warning(f'Non-existing blocks: {non_existing}')
         logger.debug(f'Syncing blocks took {timer() - start_time} seconds')
 
     def get_block(self, block_num: int):
