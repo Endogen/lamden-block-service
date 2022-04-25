@@ -10,20 +10,46 @@ from pathlib import Path
 from config import Config
 from threading import Thread
 from loguru import logger
+from datetime import datetime, timedelta
 from timeit import default_timer as timer
+from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: Erzeuge events für diverse Ereignisse
+# TODO: missing blocks, non-existing blocks all need to be stored in DB to not accidentally overwrite
+#  some unrelated data in config file
+# TODO: Look at every get / set for cfg and decide if load() / dump() is needed
+# TODO: Add another job 'consistancy_check' to check for entire block space excluding 'non_existing_blocks'
+#  With option to check also 'non_existing_blocks'
 # TODO: Global state zusammenbauen
 # TODO: Endpunkte ähnlich wie bei BlockService
 # TODO: Import von Blocks erlauben
 class BlockGrabber:
     cfg = None
     wst = None
+    sch = None
 
     def __init__(self, config: Config):
         self.cfg = config
 
+        self.__init_jobs()
+        self.__init_websocket()
+
+    def __init_jobs(self):
+        self.sch = BackgroundScheduler()
+
+        # TODO: Make sure that jobs are not overlapping
+
+        self.sch.add_job(
+            self.sync_blocks,
+            name="sync_blocks",
+            trigger='interval',
+            seconds=self.cfg.get('job_interval_sync'),
+            next_run_time=datetime.now() + timedelta(seconds=5),
+            max_instances=1)
+
+        # TODO: Add second job for consistency check
+
+    def __init_websocket(self):
         while True:
             try:
                 ws = websocket.WebSocketApp(self.cfg.get('wss_masternode'),
@@ -77,7 +103,7 @@ class BlockGrabber:
         if self.cfg.get('save_to_dir'):
             self.save_block_in_file(content)
 
-        logger.debug(f'Processing block {content["number"]} took {timer() - start_time}')
+        logger.debug(f'Processing block {content["number"]} took {timer() - start_time} seconds')
 
     def save_block_in_db(self, content: dict):
         # TODO: Create new DB connection each time to be thread safe
@@ -94,9 +120,7 @@ class BlockGrabber:
             json.dump(content, f, sort_keys=True, indent=4)
             logger.debug(f'Saved block {block_num} to file')
 
-    # TODO: Create periodic job that checks blocks between 'block_current' and 'block_latest'
-    # TODO: Process only if websocket connected
-    # TODO: Allow only one instance
+    # TODO: We need to somehow somewhere set the new block_latest
     def sync_blocks(self, start: int = None, end: int = None):
         start_time = timer()
 
@@ -104,11 +128,11 @@ class BlockGrabber:
         end = end if end else self.cfg.get('block_latest')
 
         to_sync = list(range(start + 1, end + 1))
-        logger.debug(f'Blocks to sync: {to_sync}')
+        logger.debug(f'Syncing blocks: {to_sync}')
 
-        missing = self.cfg.get('missing_blocks')
+        missing = self.cfg.get('blocks_missing')
         logger.debug(f'Missing blocks: {missing}')
-        self.cfg.set('missing_blocks', list())
+        self.cfg.set('blocks_missing', list())
 
         to_sync.extend(missing)
         to_sync.sort(key=int)
@@ -134,12 +158,13 @@ class BlockGrabber:
                         missing.append(block_num)
                         continue
                     if 'error' in block:
+                        # TODO: Add to blocks_non_existing
                         continue
 
                     self.process_block(block)
 
         self.cfg.set('block_current', end)
-        self.cfg.set('missing_blocks', missing)
+        self.cfg.set('blocks_missing', missing)
 
         logger.warning(f'Missing blocks: {missing}')
         logger.debug(f'Syncing blocks took {timer() - start_time} seconds')
