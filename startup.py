@@ -15,7 +15,7 @@ from timeit import default_timer as timer
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: Store blocks_missing, blocks_non_existing in DB to not accidentally overwrite unrelated data in config
+# TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
 # TODO: Job 'consistancy_check' to check for entire block space excluding & including 'non_existing_blocks'
 # TODO: Offer to generate global state
@@ -33,7 +33,7 @@ class BlockGrabber:
         self.__init_websocket()
 
     def __init_jobs(self):
-        self.sch = BackgroundScheduler()
+        self.sch = BackgroundScheduler(timezone="Europe/Berlin")
 
         # TODO: Make sure that jobs are not overlapping
 
@@ -46,6 +46,8 @@ class BlockGrabber:
             max_instances=1)
 
         # TODO: Add second job for consistency check
+
+        self.sch.start()
 
     def __init_websocket(self):
         while True:
@@ -102,7 +104,7 @@ class BlockGrabber:
         if self.cfg.get('save_to_dir'):
             self.save_block_in_file(content)
 
-        logger.debug(f'Processing block {content["number"]} took {timer() - start_time} seconds')
+        logger.debug(f'Processed block {content["number"]} in {timer() - start_time} seconds')
 
     def save_block_in_db(self, content: dict):
         # TODO: Create new DB connection each time to be thread safe
@@ -126,34 +128,35 @@ class BlockGrabber:
         end = end if end else self.cfg.get('block_latest')
 
         to_sync = list(range(start + 1, end + 1))
-        logger.debug(f'Syncing blocks: {to_sync}')
-
         missing = self.cfg.get('blocks_missing')
-        logger.debug(f'Missing blocks: {missing}')
-        self.cfg.set('blocks_missing', list())
+        invalid = self.cfg.get('blocks_invalid')
 
         to_sync.extend(missing)
         to_sync.sort(key=int)
-        missing = list()
 
-        non_existing = self.cfg.get('blocks_non_existing')
-        logger.debug(f'Non-existing blocks: {non_existing}')
+        if not to_sync:
+            logger.debug(f'Sync job --> Synchronized!')
+            return
+
+        logger.debug(f'Sync job --> Started...')
+        logger.debug(f'Missing: {missing}')
+        logger.debug(f'To Sync: {to_sync}')
+        logger.debug(f'Invalid: {invalid}')
 
         block_dir = self.cfg.get('save_to_dir')
         sleep_for = self.cfg.get('block_sync_wait')
 
+        missing = list()
         for block_num in to_sync:
-            logger.debug(f'Checking block {block_num}...')
-
             # TODO: Check block data in DB - If not present: self.save_block_in_db()
 
             if block_dir:
                 if Path(os.path.join(block_dir, f'{block_num}.json')).is_file():
                     logger.debug(f'Block {block_num} already exists')
                 else:
+                    time.sleep(sleep_for)
                     logger.warning(f'No file for block {block_num} in {block_dir}')
 
-                    time.sleep(sleep_for)
                     block = self.get_block(block_num)
 
                     if not block:
@@ -161,7 +164,7 @@ class BlockGrabber:
                         continue
                     if 'error' in block:
                         if block['error'] == 'Block not found.':
-                            non_existing.append(block_num)
+                            invalid.append(block_num)
                         else:
                             missing.append(block_num)
                         continue
@@ -171,20 +174,20 @@ class BlockGrabber:
         # TODO: Once data is stored in DB, set directly after each block
         self.cfg.set('block_current', end)
         self.cfg.set('blocks_missing', missing)
-        self.cfg.set('blocks_non_existing', non_existing)
+        self.cfg.set('blocks_invalid', invalid)
 
-        logger.warning(f'Missing blocks: {missing}')
-        logger.warning(f'Non-existing blocks: {non_existing}')
-        logger.debug(f'Syncing blocks took {timer() - start_time} seconds')
+        logger.warning(f'Missing: {missing}')
+        logger.warning(f'Invalid: {invalid}')
+        logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_num: int):
-        source = self.cfg.get('url_blockservice')
+        source = self.cfg.get('url_masternode')
         if source:
-            source += f'/blocks/{block_num}'
+            source += f'/blocks?num={block_num}'
         else:
-            source = self.cfg.get('url_masternode')
+            source = self.cfg.get('url_blockservice')
             if source:
-                source += f'/blocks?num={block_num}'
+                source += f'/blocks/{block_num}'
             else:
                 logger.error(f'get_block({block_num}) --> No data source set')
                 return None
