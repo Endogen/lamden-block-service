@@ -1,11 +1,12 @@
 {
     "block_current": 847871,
     "block_latest": 847871,
-    "blocks_to_sync": [],
     "log_level": "DEBUG",
     "reconnect_after": 10,
-    "save_blocks_to": "/Users/endogen/Projekte/lamden-blocks",
-    "url_block_service": "https://blockservice.nebulamden.finance",
+    "block_sync_wait": 1,
+    "missing_blocks": [],
+    "save_to_dir": "/Users/endogen/Projekte/lamden-blocks",
+    "url_blockservice": "https://blockservice.nebulamden.finance",
     "url_masternode": "https://masternode-01.lamden.io",
     "wss_masternode": "wss://masternode-01.lamden.io"
 }
