@@ -6,7 +6,7 @@
     "block_sync_wait": 1,
     "blocks_missing": [],
     "job_interval_sync": 60,
-    "blocks_non_existing": [],
+    "blocks_non_existing": [70704, 501400, 501401, 507274, 507275, 507992, 626402, 844631, 844646],
     "job_interval_consistency": 86400,
     "save_to_dir": "/Users/endogen/Projekte/lamden-blocks",
     "url_blockservice": "https://blockservice.nebulamden.finance",
