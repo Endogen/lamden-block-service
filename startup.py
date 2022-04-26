@@ -5,6 +5,7 @@ import rel
 import json
 import websocket
 import requests as r
+from requests import Response
 
 from database import DB
 from pathlib import Path
@@ -16,6 +17,7 @@ from timeit import default_timer as timer
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
+# TODO: Make sure config can be changed without restart of Block Grabber
 # TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
 # TODO: Job 'consistancy_check' to check for entire block space excluding & including 'non_existing_blocks'
@@ -183,29 +185,31 @@ class BlockGrabber:
         logger.warning(f'Invalid: {invalid}')
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
+    # TODO: Add possibility to use more than one Block Service
     def get_block(self, block_num: int):
-        source = self.cfg.get('url_masternode')
-        if source:
-            source += f'/blocks?num={block_num}'
-        else:
-            source = self.cfg.get('url_blockservice')
-            if source:
-                source += f'/blocks/{block_num}'
-            else:
-                logger.error(f'get_block({block_num}) --> No data source set')
-                return None
+        source_bs = self.cfg.get('url_blockservice').replace('{block_num}', block_num)
+        source_mn = self.cfg.get('url_masternode').replace('{block_num}', block_num)
 
         try:
-            with r.get(source) as data:
-                logger.debug(f'Block {block_num} --> {data.text}')
+            def block_is_ok(response: Response):
+                block_data = response.json()
 
-                block = data.json()
+                if 'error' in block_data:
+                    return False, block_data
+                if block_data['hash'] == 'block-does-not-exist':
+                    return False, block_data
 
-                if 'hash' in block:
-                    if block['hash'] == 'block-does-not-exist':
-                        return None
+            with r.get(source_bs) as data:
+                logger.debug(f'Block {block_num} via BlockService --> {data.text}')
+                block_ok, block = block_is_ok(data)
+                if block_ok: return block
 
-                return block
+            logger.warning('No valid block data from BlockService. Trying Masternode...')
+
+            with r.get(source_mn) as data:
+                logger.debug(f'Block {block_num} via Masternode --> {data.text}')
+                block_ok, block = block_is_ok(data)
+                return block if block_ok else None
 
         except Exception as e:
             logger.exception(f'get_block({block_num}) --> {e}')
