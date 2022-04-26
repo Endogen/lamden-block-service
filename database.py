@@ -1,3 +1,4 @@
+import os
 import psycopg2
 
 from loguru import logger
@@ -23,33 +24,38 @@ class DB:
         self.db_host = self.cfg.get('db_host')
         self.db_port = self.cfg.get('db_port')
 
-        # TODO: Only if not already present
-        self.create_database(self.connection(), self.sql('create_db.sql'))
+        db_exists = self.execute_sql('table_exists', self.db_name)
+        print(db_exists)
+        self.execute_sql('create_db')
 
-    def connection(self):
+    def _connect(self):
         connection = None
+
         try:
             connection = psycopg2.connect(
                 database=self.db_name,
                 user=self.db_user,
                 password=self.db_pass,
                 host=self.db_host,
-                port=self.db_port,
-            )
-            logger.debug('Connection to PostgreSQL DB successful')
+                port=self.db_port)
+            connection.autocommit = True
+
         except OperationalError as e:
-            logger.exception(f"The error '{e}' occurred")
+            logger.exception(f'Error while connecting to DB: {e}')
+
         return connection
 
-    def sql(self, file):
-        with open(file, "r", encoding="utf8") as f:
+    def _sql(self, file):
+        with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
             return f.read()
 
-    def create_database(self, connection, query):
-        connection.autocommit = True
-        cursor = connection.cursor()
+    def execute_sql(self, name: str, *args):
+        cursor = self._connect().cursor()
+        query = self._sql(f'{name}.sql')
+
         try:
-            cursor.execute(query)
-            logger.debug('Query executed successfully')
+            cursor.execute(query, args)
+            return cursor.fetchall()
+
         except OperationalError as e:
-            logger.exception(f"The error '{e}' occurred")
+            logger.exception(f'Error while executing SQL: {e}')

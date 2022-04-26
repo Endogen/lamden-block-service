@@ -20,7 +20,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # TODO: Make sure config can be changed without restart of Block Grabber
 # TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
-# TODO: Job 'consistancy_check' to check for entire block space excluding & including 'non_existing_blocks'
 # TODO: Offer to generate global state
 # TODO: Use similar API to BlockService
 # TODO: Allow importing blocks via file, GitHub
@@ -32,15 +31,13 @@ class BlockGrabber:
 
     def __init__(self, config: Config):
         self.cfg = config
-        self.db = DB(self.cfg)
+        #self.db = DB(self.cfg)
 
         self.__init_jobs()
         self.__init_websocket()
 
     def __init_jobs(self):
         self.sch = BackgroundScheduler(timezone="Europe/Berlin")
-
-        # TODO: Make sure that jobs are not overlapping
 
         self.sch.add_job(
             self.sync_blocks,
@@ -49,8 +46,6 @@ class BlockGrabber:
             seconds=self.cfg.get('job_interval_sync'),
             next_run_time=datetime.now() + timedelta(seconds=5),
             max_instances=1)
-
-        # TODO: Add second job for consistency check
 
         self.sch.start()
 
@@ -88,7 +83,7 @@ class BlockGrabber:
         if event == 'latest_block':
             self.cfg.set('block_latest', block['number'])
         elif event == 'new_block':
-            Thread(target=self.process_block, args=block)
+            Thread(target=self.process_block, args=[block]).start()
 
     def on_error(self, ws, error):
         logger.debug(error)
@@ -126,6 +121,7 @@ class BlockGrabber:
             json.dump(content, f, sort_keys=True, indent=4)
             logger.debug(f'Saved block {block_num} to file')
 
+    # TODO: Check in DB if block exists. If no, check if it is part of 'blocks_invalid'
     def sync_blocks(self, start: int = None, end: int = None):
         start_time = timer()
 
@@ -160,9 +156,9 @@ class BlockGrabber:
                     logger.debug(f'Block {block_num} already exists')
                 else:
                     time.sleep(sleep_for)
-                    logger.warning(f'No file for block {block_num} in {block_dir}')
+                    logger.debug(f'No file for block {block_num} in {block_dir}')
 
-                    block = self.get_block(block_num)
+                    _, block = self.get_block(block_num)
 
                     if not block:
                         missing.append(block_num)
@@ -181,39 +177,40 @@ class BlockGrabber:
         self.cfg.set('blocks_missing', missing)
         self.cfg.set('blocks_invalid', invalid)
 
-        logger.warning(f'Missing: {missing}')
-        logger.warning(f'Invalid: {invalid}')
+        logger.debug(f'Missing: {missing}')
+        logger.debug(f'Invalid: {invalid}')
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
+    def is_block_valid(self, response: Response) -> (bool, dict):
+        block_data = response.json()
+
+        if 'error' in block_data:
+            return False, block_data
+        if block_data['hash'] == 'block-does-not-exist':
+            return False, block_data
+
+        return True, block_data
+
     # TODO: Add possibility to use more than one Block Service
-    def get_block(self, block_num: int):
-        source_bs = self.cfg.get('url_blockservice').replace('{block_num}', block_num)
-        source_mn = self.cfg.get('url_masternode').replace('{block_num}', block_num)
+    def get_block(self, block_num: int) -> (bool, dict):
+        source_bs = self.cfg.get('url_blockservice').replace('{block_num}', str(block_num))
+        source_mn = self.cfg.get('url_masternode').replace('{block_num}', str(block_num))
 
         try:
-            def block_is_ok(response: Response):
-                block_data = response.json()
-
-                if 'error' in block_data:
-                    return False, block_data
-                if block_data['hash'] == 'block-does-not-exist':
-                    return False, block_data
-
             with r.get(source_bs) as data:
                 logger.debug(f'Block {block_num} via BlockService --> {data.text}')
-                block_ok, block = block_is_ok(data)
-                if block_ok: return block
+                block_valid, block = self.is_block_valid(data)
+                if block_valid: return block_valid, block
 
             logger.warning('No valid block data from BlockService. Trying Masternode...')
 
             with r.get(source_mn) as data:
                 logger.debug(f'Block {block_num} via Masternode --> {data.text}')
-                block_ok, block = block_is_ok(data)
-                return block if block_ok else None
+                return self.is_block_valid(data)
 
         except Exception as e:
             logger.exception(f'get_block({block_num}) --> {e}')
-            return None
+            return False, None
 
 
 if __name__ == "__main__":

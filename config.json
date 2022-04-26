@@ -1,7 +1,7 @@
 {
-    "block_current": 848301,
-    "block_latest": 848301,
-    "block_sync_wait": 3,
+    "block_current": 848661,
+    "block_latest": 848661,
+    "block_sync_wait": 0,
     "blocks_invalid": [
         70704,
         501400,
@@ -14,6 +14,11 @@
         844646
     ],
     "blocks_missing": [],
+    "db_host": "127.0.0.1",
+    "db_name": "lamden_blocks",
+    "db_pass": "",
+    "db_port": 5432,
+    "db_user": "endogen",
     "job_interval_consistency": 86400,
     "job_interval_sync": 60,
     "log_level": "DEBUG",
@@ -21,10 +26,5 @@
     "save_to_dir": "/Users/endogen/Projekte/lamden-blocks",
     "url_blockservice": "https://blockservice.nebulamden.finance/blocks/{block_num}",
     "url_masternode": "https://masternode-01.lamden.io/blocks?num={block_num}",
-    "wss_masternode": "wss://masternode-01.lamden.io",
-    "db_name": "lamden_blocks",
-    "db_user": "endogen",
-    "db_pass": "",
-    "db_host": "127.0.0.1",
-    "db_port": 5432
+    "wss_masternode": "wss://masternode-01.lamden.io"
 }
