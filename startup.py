@@ -6,6 +6,7 @@ import json
 import websocket
 import requests as r
 
+from database import DB
 from pathlib import Path
 from config import Config
 from threading import Thread
@@ -25,9 +26,11 @@ class BlockGrabber:
     cfg = None
     wst = None
     sch = None
+    db = None
 
     def __init__(self, config: Config):
         self.cfg = config
+        self.db = DB(self.cfg)
 
         self.__init_jobs()
         self.__init_websocket()
