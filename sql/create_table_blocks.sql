@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS blocks (
+  block_num SERIAL PRIMARY KEY,
+  block JSONB NOT NULL
+)

@@ -1,7 +1,1 @@
-SELECT EXISTS (
-    SELECT FROM
-        pg_tables
-    WHERE
-        schemaname = 'public' AND
-        tablename  = 'lamden_blocks'
-    );
+SELECT 1 FROM pg_database WHERE datname = 'lamden_blocks'

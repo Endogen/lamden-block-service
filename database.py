@@ -24,9 +24,14 @@ class DB:
         self.db_host = self.cfg.get('db_host')
         self.db_port = self.cfg.get('db_port')
 
-        db_exists = self.execute_sql('table_exists', self.db_name)
-        print(db_exists)
-        self.execute_sql('create_db')
+        self.execute_sql('drop_db')
+
+        result = self.execute_sql('table_exists', self.db_name)
+        if result and result[0] and result[0][0]:
+            if result[0][0] != 1:
+                self.execute_sql('create_db')
+
+        self.execute_sql('create_table_blocks')
 
     def _connect(self):
         connection = None
@@ -49,6 +54,7 @@ class DB:
         with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
             return f.read()
 
+    # TODO: Do this better with 'with' or connection.close()?
     def execute_sql(self, name: str, *args):
         cursor = self._connect().cursor()
         query = self._sql(f'{name}.sql')

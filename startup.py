@@ -31,12 +31,12 @@ class BlockGrabber:
 
     def __init__(self, config: Config):
         self.cfg = config
-        #self.db = DB(self.cfg)
+        self.db = DB(self.cfg)
 
-        self.__init_jobs()
+        self.__init_sync()
         self.__init_websocket()
 
-    def __init_jobs(self):
+    def __init_sync(self):
         self.sch = BackgroundScheduler(timezone="Europe/Berlin")
 
         self.sch.add_job(

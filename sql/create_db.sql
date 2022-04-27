@@ -1,1 +1,1 @@
-CREATE DATABASE lamden_blocks
+CREATE DATABASE %s
