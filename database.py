@@ -24,12 +24,10 @@ class DB:
         self.db_host = self.cfg.get('db_host')
         self.db_port = self.cfg.get('db_port')
 
-        self.execute_sql('drop_db')
+        result = self.execute_sql('db_exists', self.db_name)
 
-        result = self.execute_sql('table_exists', self.db_name)
-        if result and result[0] and result[0][0]:
-            if result[0][0] != 1:
-                self.execute_sql('create_db')
+        if result and result[0][0] != 1:
+            self.execute_sql('create_db', self.db_name)
 
         self.execute_sql('create_table_blocks')
 
@@ -54,14 +52,17 @@ class DB:
         with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
             return f.read()
 
-    # TODO: Do this better with 'with' or connection.close()?
+    # TODO: Do this better with 'with' or cursor.close() & connection.close()?
     def execute_sql(self, name: str, *args):
-        cursor = self._connect().cursor()
-        query = self._sql(f'{name}.sql')
-
         try:
+            cursor = self._connect().cursor()
+            query = self._sql(f'{name}.sql')
             cursor.execute(query, args)
-            return cursor.fetchall()
+
+            if cursor.rowcount > 0:
+                return cursor.fetchall()
+            else:
+                return None
 
         except OperationalError as e:
             logger.exception(f'Error while executing SQL: {e}')

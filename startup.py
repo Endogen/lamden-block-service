@@ -214,7 +214,7 @@ class BlockGrabber:
 
 
 if __name__ == "__main__":
-    cfg = Config('config.json')
+    cfg = Config(os.path.join('cfg', 'config.json'))
 
     logger.add(
         os.path.join('log', '{time}.log'),
