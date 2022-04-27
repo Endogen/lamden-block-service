@@ -32,8 +32,6 @@ class DB:
         self.execute_sql('create_table_blocks')
 
     def _connect(self):
-        connection = None
-
         try:
             connection = psycopg2.connect(
                 database=self.db_name,
@@ -43,26 +41,33 @@ class DB:
                 port=self.db_port)
             connection.autocommit = True
 
+            return connection
+
         except OperationalError as e:
             logger.exception(f'Error while connecting to DB: {e}')
-
-        return connection
 
     def _sql(self, file):
         with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
             return f.read()
 
-    # TODO: Do this better with 'with' or cursor.close() & connection.close()?
     def execute_sql(self, name: str, *args):
-        try:
-            cursor = self._connect().cursor()
-            query = self._sql(f'{name}.sql')
-            cursor.execute(query, args)
+        con = cur = None
 
-            if cursor.rowcount > 0:
-                return cursor.fetchall()
+        try:
+            con = self._connect()
+            cur = con.cursor()
+
+            query = self._sql(f'{name}.sql')
+            cur.execute(query, args)
+
+            if cur.rowcount > 0:
+                return cur.fetchall()
             else:
                 return None
 
         except OperationalError as e:
             logger.exception(f'Error while executing SQL: {e}')
+
+        finally:
+            if cur: cur.close()
+            if con: con.close()
