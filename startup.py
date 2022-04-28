@@ -101,6 +101,7 @@ class BlockGrabber:
         self.cfg.set('block_latest', content['number'])
 
         self.save_block_in_db(content)
+        self.save_tx_in_db(content)
 
         if self.cfg.get('save_to_dir'):
             self.save_block_in_file(content)
@@ -108,10 +109,14 @@ class BlockGrabber:
         logger.debug(f'Processed block {content["number"]} in {timer() - start_time} seconds')
 
     def save_block_in_db(self, content: dict):
-        block_num = content['number']
+        self.db.execute_sql('insert_block', {'bn': content['number'], 'b': json.dumps(content)})
+        logger.debug(f'Saved block {content["number"]} in database')
 
-        self.db.execute_sql('insert_block', {'bn': block_num, 'b': json.dumps(content)})
-        logger.debug(f'Saved block {block_num} in database')
+    def save_tx_in_db(self, content: dict):
+        for subblock in content['subblocks']:
+            for tx in subblock['transactions']:
+                self.db.execute_sql('insert_transaction', {'h': tx['hash'], 't': json.dumps(tx)})
+                logger.debug(f'Saved Transaction {tx["hash"]} in database')
 
     def save_block_in_file(self, content: dict):
         block_dir = self.cfg.get('save_to_dir')
