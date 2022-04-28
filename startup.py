@@ -21,7 +21,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # TODO: Make sure config can be changed without restarting Block Service
 # TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
-# TODO: Offer API to generate global state
 # TODO: Use similar API as default Block Service
 # TODO: Allow importing blocks via file and GitHub
 class BlockGrabber:
@@ -30,9 +29,9 @@ class BlockGrabber:
     sch = None
     db = None
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, database: DB):
         self.cfg = config
-        self.db = DB(self.cfg)
+        self.db = database
 
         self.__init_sync()
         self.__init_websocket()
@@ -101,22 +100,12 @@ class BlockGrabber:
         self.cfg.set('block_latest', content['number'])
 
         self.save_block_in_db(content)
-        self.save_tx_in_db(content)
+        self.save_transaction_in_db(content)
 
         if self.cfg.get('save_to_dir'):
             self.save_block_in_file(content)
 
         logger.debug(f'Processed block {content["number"]} in {timer() - start_time} seconds')
-
-    def save_block_in_db(self, content: dict):
-        self.db.execute_sql('insert_block', {'bn': content['number'], 'b': json.dumps(content)})
-        logger.debug(f'Saved block {content["number"]} in database')
-
-    def save_tx_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                self.db.execute_sql('insert_transaction', {'h': tx['hash'], 't': json.dumps(tx)})
-                logger.debug(f'Saved Transaction {tx["hash"]} in database')
 
     def save_block_in_file(self, content: dict):
         block_dir = self.cfg.get('save_to_dir')
@@ -128,6 +117,31 @@ class BlockGrabber:
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(content, f, sort_keys=True, indent=4)
             logger.debug(f'Saved block {block_num} in file')
+
+    def save_block_in_db(self, content: dict):
+        self.db.execute('insert_block', {'bn': content['number'], 'b': json.dumps(content)})
+        logger.debug(f'Saved block {content["number"]} in database')
+
+    def save_transaction_in_db(self, content: dict):
+        for subblock in content['subblocks']:
+            for tx in subblock['transactions']:
+                self.db.execute('insert_transaction', {'h': tx['hash'], 't': json.dumps(tx)})
+                logger.debug(f'Saved Transaction {tx["hash"]} in database')
+
+    def save_state_change_in_db(self):
+        pass
+
+    def save_current_state_in_db(self):
+        pass
+
+    def save_contract_in_db(self):
+        pass
+
+    def save_address_stats(self):
+        pass
+
+    def save_contract_stats(self):
+        pass
 
     # TODO: Check in DB if block exists. If no, check if it is part of 'blocks_invalid'
     def sync_blocks(self, start: int = None, end: int = None):
@@ -231,4 +245,4 @@ if __name__ == "__main__":
         rotation='5 MB',
         diagnose=True)
 
-    BlockGrabber(cfg)
+    BlockGrabber(cfg, DB(cfg))

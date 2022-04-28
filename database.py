@@ -24,13 +24,13 @@ class DB:
         self.db_host = self.cfg.get('db_host')
         self.db_port = self.cfg.get('db_port')
 
-        result = self.execute_sql('db_exists', {'name': self.db_name})
+        result = self.execute('db_exists', {'name': self.db_name})
 
         if result and result[0][0] != 1:
-            self.execute_sql('create_db', {'name': self.db_name})
+            self.execute('create_db', {'name': self.db_name})
 
-        self.execute_sql('create_table_blocks')
-        self.execute_sql('create_table_transactions')
+        self.execute('create_blocks')
+        self.execute('create_transactions')
 
     def _connect(self):
         try:
@@ -51,7 +51,7 @@ class DB:
         with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
             return f.read()
 
-    def execute_sql(self, name: str, params: dict = None):
+    def execute(self, name: str, params: dict = None):
         con = cur = None
 
         try:
