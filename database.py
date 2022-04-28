@@ -24,12 +24,13 @@ class DB:
         self.db_host = self.cfg.get('db_host')
         self.db_port = self.cfg.get('db_port')
 
-        result = self.execute_sql('db_exists', self.db_name)
+        result = self.execute_sql('db_exists', {'name': self.db_name})
 
         if result and result[0][0] != 1:
-            self.execute_sql('create_db', self.db_name)
+            self.execute_sql('create_db', {'name': self.db_name})
 
         self.execute_sql('create_table_blocks')
+        self.execute_sql('create_table_transactions')
 
     def _connect(self):
         try:
@@ -50,7 +51,7 @@ class DB:
         with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
             return f.read()
 
-    def execute_sql(self, name: str, *args):
+    def execute_sql(self, name: str, params: dict = None):
         con = cur = None
 
         try:
@@ -58,15 +59,13 @@ class DB:
             cur = con.cursor()
 
             query = self._sql(f'{name}.sql')
-            cur.execute(query, args)
+            cur.execute(query, params)
 
-            if cur.rowcount > 0:
-                return cur.fetchall()
-            else:
-                return None
+            return cur.fetchall()
 
-        except OperationalError as e:
-            logger.exception(f'Error while executing SQL: {e}')
+        except Exception as e:
+            if 'no results to fetch' not in str(e):
+                logger.exception(f'Error while executing SQL: {e}')
 
         finally:
             if cur: cur.close()

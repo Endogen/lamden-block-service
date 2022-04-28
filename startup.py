@@ -17,12 +17,13 @@ from timeit import default_timer as timer
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: Make sure config can be changed without restart of Block Grabber
+# TODO: Job to remove logs after some time
+# TODO: Make sure config can be changed without restarting Block Service
 # TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
-# TODO: Offer to generate global state
-# TODO: Use similar API to BlockService
-# TODO: Allow importing blocks via file, GitHub
+# TODO: Offer API to generate global state
+# TODO: Use similar API as default Block Service
+# TODO: Allow importing blocks via file and GitHub
 class BlockGrabber:
     cfg = None
     wst = None
@@ -107,8 +108,10 @@ class BlockGrabber:
         logger.debug(f'Processed block {content["number"]} in {timer() - start_time} seconds')
 
     def save_block_in_db(self, content: dict):
-        # TODO: Create new DB connection each time to be thread safe
-        pass
+        block_num = content['number']
+
+        self.db.execute_sql('insert_block', {'bn': block_num, 'b': json.dumps(content)})
+        logger.debug(f'Saved block {block_num} in database')
 
     def save_block_in_file(self, content: dict):
         block_dir = self.cfg.get('save_to_dir')
@@ -119,7 +122,7 @@ class BlockGrabber:
 
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(content, f, sort_keys=True, indent=4)
-            logger.debug(f'Saved block {block_num} to file')
+            logger.debug(f'Saved block {block_num} in file')
 
     # TODO: Check in DB if block exists. If no, check if it is part of 'blocks_invalid'
     def sync_blocks(self, start: int = None, end: int = None):
@@ -220,7 +223,7 @@ if __name__ == "__main__":
         os.path.join('log', '{time}.log'),
         format='{time} {name} {message}',
         level=cfg.get('log_level'),
-        rotation='1 MB',
+        rotation='5 MB',
         diagnose=True)
 
     BlockGrabber(cfg)
