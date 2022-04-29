@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS blocks (
   block_num SERIAL PRIMARY KEY,
-  block JSONB NOT NULL
+  block JSONB NOT NULL,
+  created TIMESTAMP DEFAULT now()
 )

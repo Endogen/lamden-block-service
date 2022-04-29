@@ -125,7 +125,10 @@ class BlockGrabber:
     def save_transaction_in_db(self, content: dict):
         for subblock in content['subblocks']:
             for tx in subblock['transactions']:
-                self.db.execute('insert_transaction', {'h': tx['hash'], 't': json.dumps(tx)})
+                self.db.execute(
+                    'insert_transaction',
+                    {'h': tx['hash'], 't': json.dumps(tx), 'b': content['number']})
+
                 logger.debug(f'Saved Transaction {tx["hash"]} in database')
 
     def save_state_change_in_db(self):
