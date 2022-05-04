@@ -17,6 +17,7 @@ from timeit import default_timer as timer
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
+# TODO: Add API for address Toplist (TAU or any other token)
 # TODO: Job to remove logs after some time
 # TODO: Make sure config can be changed without restarting Block Service
 # TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
