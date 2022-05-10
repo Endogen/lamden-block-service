@@ -83,6 +83,7 @@ class BlockGrabber:
         if event == 'latest_block':
             self.cfg.set('block_latest', block['number'])
         elif event == 'new_block':
+            self.cfg.set('block_latest', block['number'])
             Thread(target=self.process_block, args=[block]).start()
 
     def on_error(self, ws, error):
@@ -97,10 +98,11 @@ class BlockGrabber:
     def process_block(self, content: dict):
         start_time = timer()
 
-        self.cfg.set('block_latest', content['number'])
-
+        # TODO: Combine all this in one method? More efficient
         self.save_block_in_db(content)
         self.save_transaction_in_db(content)
+        self.save_state_change_in_db(content)
+        self.save_current_state_in_db(content)
 
         if self.cfg.get('save_to_dir'):
             self.save_block_in_file(content)
@@ -123,7 +125,7 @@ class BlockGrabber:
         logger.debug(f'Saved block {content["number"]} in database')
 
     def save_transaction_in_db(self, content: dict):
-        for subblock in content['subblocks']:
+        for subblock in self._get_block_without_state(content)['subblocks']:
             for tx in subblock['transactions']:
                 self.db.execute(
                     'insert_transaction',
@@ -131,22 +133,44 @@ class BlockGrabber:
 
                 logger.debug(f'Saved Transaction {tx["hash"]} in database')
 
-    def save_state_change_in_db(self):
+    def save_state_change_in_db(self, content: dict):
+        for subblock in content['subblocks']:
+            for tx in subblock['transactions']:
+                if 'state' in tx:
+                    self.db.execute(
+                        'insert_state_change',
+                        {'txh': tx['hash'], 's': json.dumps(tx['state'])})
+
+                    logger.debug(f'Saved State Change from {tx["hash"]} in database')
+                else:
+                    logger.debug(f'State Change: No state change in tx {tx["hash"]}')
+
+    def save_current_state_in_db(self, content: dict):
+        for subblock in content['subblocks']:
+            for tx in subblock['transactions']:
+                if 'state' in tx:
+                    for kv in tx['state']:
+                        key = kv['key']
+                        value = kv['value']
+
+                        if type(value) is dict:
+                            value = next(iter(value.values()))
+
+                        self.db.execute(
+                            'insert_current_state',
+                            {'txh': tx['hash'], 'k': key, 'v': value, 's': json.dumps(kv)})
+
+                    logger.debug(f'Saved Current State from {tx["hash"]} in database')
+                else:
+                    logger.debug(f'Current State: No state change in tx {tx["hash"]}')
+
+    def save_contract_in_db(self, content: dict):
         pass
 
-    def save_current_state_in_db(self):
+    def save_address_in_db(self, content: dict):
         pass
 
-    def save_contract_in_db(self):
-        pass
-
-    def save_address_stats(self):
-        pass
-
-    def save_contract_stats(self):
-        pass
-
-    # TODO: Check in DB if block exists. If no, check if it is part of 'blocks_invalid'
+    # TODO: Check in DB if block exists. If not, check if it is part of 'blocks_invalid'
     def sync_blocks(self, start: int = None, end: int = None):
         start_time = timer()
 
@@ -236,6 +260,12 @@ class BlockGrabber:
         except Exception as e:
             logger.exception(f'get_block({block_num}) --> {e}')
             return False, None
+
+    def _get_block_without_state(self, d: dict):
+        new_d = dict(d)
+        if 'state' in new_d:
+            del new_d['state']
+        return new_d
 
 
 if __name__ == "__main__":
