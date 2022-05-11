@@ -6,7 +6,6 @@ from config import Config
 from psycopg2 import OperationalError
 
 
-# TODO: Can state changes or current state objects be empty? Adjust SQL!
 # TODO: Convert to factory so that different databases can be used - based on config
 class DB:
 
@@ -29,14 +28,13 @@ class DB:
         result = self.execute('db_exists', {'name': self.db_name})
 
         if result and result[0][0] != 1:
-            self.execute('create_db', {'name': self.db_name})
+            self.execute('db_create', {'name': self.db_name})
 
-        self.execute('create_blocks')
-        self.execute('create_transactions')
-        self.execute('create_state_change')
-        self.execute('create_function_timestamp')
-        self.execute('create_trigger_updated')
-        self.execute('create_current_state')
+        self.execute('blocks_create')
+        self.execute('transactions_create')
+        self.execute('state_change_create')
+        self.execute('current_state_create')
+        self.execute('contracts_create')
 
     def _connect(self):
         try:
