@@ -35,6 +35,7 @@ class DB:
         self.execute('state_change_create')
         self.execute('current_state_create')
         self.execute('contracts_create')
+        self.execute('addresses_create')
 
     def _connect(self):
         try:

@@ -5,6 +5,7 @@ import rel
 import json
 import websocket
 import requests as r
+import utils
 
 from requests import Response
 from database import DB
@@ -190,7 +191,21 @@ class BlockHustler:
                     logger.debug(f'Saved contract {name} in database')
 
     def save_address_in_db(self, content: dict):
-        pass
+        for subblock in content['subblocks']:
+            for tx in subblock['transactions']:
+                pld = tx['transaction']['payload']
+                sender = pld['sender']
+
+                if utils.is_valid_address(sender):
+                    self.db.execute('addresses_insert', {'a': sender})
+                    logger.debug(f'Saving address in database: {sender}')
+
+                if 'kwargs' in pld:
+                    if 'to' in pld['kwargs']:
+                        to = pld['kwargs']['to']
+                        if utils.is_valid_address(to):
+                            self.db.execute('addresses_insert', {'a': to})
+                            logger.debug(f'Saving address in database: {to}')
 
     def sync_blocks(self, start: int = None, end: int = None):
         start_time = timer()
