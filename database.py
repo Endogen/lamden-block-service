@@ -10,41 +10,30 @@ from psycopg2 import OperationalError
 class DB:
 
     cfg = None
-    db_name = None
-    db_user = None
-    db_pass = None
-    db_host = None
-    db_port = None
+
+    _db_name = None
+    _db_user = None
+    _db_pass = None
+    _db_host = None
+    _db_port = None
 
     def __init__(self, config: Config):
         self.cfg = config
 
-        self.db_name = self.cfg.get('db_name')
-        self.db_user = self.cfg.get('db_user')
-        self.db_pass = self.cfg.get('db_pass')
-        self.db_host = self.cfg.get('db_host')
-        self.db_port = self.cfg.get('db_port')
-
-        result = self.execute('db_exists', {'name': self.db_name})
-
-        if result and result[0][0] != 1:
-            self.execute('db_create', {'name': self.db_name})
-
-        self.execute('blocks_create')
-        self.execute('transactions_create')
-        self.execute('state_change_create')
-        self.execute('current_state_create')
-        self.execute('contracts_create')
-        self.execute('addresses_create')
+        self._db_name = self.cfg.get('db_name')
+        self._db_user = self.cfg.get('db_user')
+        self._db_pass = self.cfg.get('db_pass')
+        self._db_host = self.cfg.get('db_host')
+        self._db_port = self.cfg.get('db_port')
 
     def _connect(self):
         try:
             connection = psycopg2.connect(
-                database=self.db_name,
-                user=self.db_user,
-                password=self.db_pass,
-                host=self.db_host,
-                port=self.db_port)
+                database=self._db_name,
+                user=self._db_user,
+                password=self._db_pass,
+                host=self._db_host,
+                port=self._db_port)
             connection.autocommit = True
 
             return connection
