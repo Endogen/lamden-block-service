@@ -179,6 +179,7 @@ class Block:
 
             self.cfg.set('block_current', block_num)
 
+        self.cfg.set('block_current', end)
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_num: int) -> (BlockState, dict):
