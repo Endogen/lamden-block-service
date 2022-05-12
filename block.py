@@ -148,8 +148,6 @@ class Block:
         missing = self.db.execute('blocks_missing_select')
         missing = [x[0] for x in missing]
 
-        self.db.execute('blocks_missing_delete')
-
         to_sync.extend(missing)
         to_sync = list(set(to_sync))
         to_sync.sort(key=int)
@@ -167,6 +165,9 @@ class Block:
             time.sleep(sleep_for)
 
             state, block = self.get_block(block_num)
+
+            if block_num in missing and state != BlockState.MISSING:
+                self.db.execute('blocks_missing_delete', {'bn': block_num})
 
             if state == BlockState.OK:
                 self.process(block)
