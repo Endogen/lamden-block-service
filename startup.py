@@ -4,16 +4,13 @@ import time
 import rel
 import json
 import websocket
-import requests as r
-import utils
 
-from requests import Response
+from block import Block
 from database import DB
 from config import Config
 from threading import Thread
 from loguru import logger
 from datetime import datetime, timedelta
-from timeit import default_timer as timer
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -28,14 +25,17 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # TODO: API for total stamps used for address
 # TODO: API for 'network involvement' of an address - how much other addresses transacted with address?
 class BlockHustler:
+
+    db = None
     cfg = None
     wst = None
-    sch = None
-    db = None
+    block = None
+    scheduler = None
 
-    def __init__(self, config: Config, database: DB):
+    def __init__(self, config: Config, database: DB, block: Block):
         self.cfg = config
         self.db = database
+        self.block = block
 
         self.__init_db()
         self.__init_sync()
@@ -48,6 +48,8 @@ class BlockHustler:
             self.db.execute('db_create', {'name': 'lamden_blocks'})
 
         self.db.execute('blocks_create')
+        self.db.execute('blocks_invalid_create')
+        self.db.execute('blocks_missing_create')
         self.db.execute('transactions_create')
         self.db.execute('state_change_create')
         self.db.execute('current_state_create')
@@ -55,17 +57,17 @@ class BlockHustler:
         self.db.execute('addresses_create')
 
     def __init_sync(self):
-        self.sch = BackgroundScheduler(timezone="Europe/Berlin")
+        self.scheduler = BackgroundScheduler(timezone="Europe/Berlin")
 
-        self.sch.add_job(
-            self.sync_blocks,
+        self.scheduler.add_job(
+            self.block.sync,
             name="sync_blocks",
             trigger='interval',
             seconds=self.cfg.get('job_interval_sync'),
             next_run_time=datetime.now() + timedelta(seconds=5),
             max_instances=1)
 
-        self.sch.start()
+        self.scheduler.start()
 
     def __init_websocket(self):
         while True:
@@ -102,7 +104,7 @@ class BlockHustler:
             self.cfg.set('block_latest', block['number'])
         elif event == 'new_block':
             self.cfg.set('block_latest', block['number'])
-            Thread(target=self.process_block, args=[block]).start()
+            Thread(target=self.block.process, args=[block]).start()
 
     def on_error(self, ws, error):
         logger.debug(error)
@@ -113,237 +115,10 @@ class BlockHustler:
     def on_open(self, ws):
         logger.debug("Opened websocket connection")
 
-    def process_block(self, content: dict):
-        start_time = timer()
-
-        self.save_block_in_db(content)
-        self.save_transaction_in_db(content)
-        self.save_state_change_in_db(content)
-        self.save_current_state_in_db(content)
-        self.save_contract_in_db(content)
-        self.save_address_in_db(content)
-
-        if self.cfg.get('save_to_dir'):
-            self.save_block_in_file(content)
-
-        logger.debug(f'Processed block {content["number"]} in {timer() - start_time} seconds')
-
-    def save_block_in_file(self, content: dict):
-        block_dir = self.cfg.get('save_to_dir')
-        block_num = content['number']
-
-        file = os.path.join(block_dir, f'{block_num}.json')
-        os.makedirs(os.path.dirname(file), exist_ok=True)
-
-        with open(file, 'w', encoding='utf-8') as f:
-            json.dump(content, f, sort_keys=True, indent=4)
-            logger.debug(f'Saved block {block_num} in file')
-
-    def save_block_in_db(self, content: dict):
-        self.db.execute('blocks_insert', {'bn': content['number'], 'b': json.dumps(content)})
-        logger.debug(f'Saved block {content["number"]} in database')
-
-    def save_transaction_in_db(self, content: dict):
-        for subblock in self._get_block_without_state(content)['subblocks']:
-            for tx in subblock['transactions']:
-                self.db.execute(
-                    'transactions_insert',
-                    {'h': tx['hash'], 't': json.dumps(tx), 'b': content['number']})
-
-                logger.debug(f'Saved transaction {tx["hash"]} in database')
-
-    def save_state_change_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                if 'state' in tx:
-                    self.db.execute(
-                        'state_change_insert',
-                        {'txh': tx['hash'], 's': json.dumps(tx['state'])})
-
-                    logger.debug(f'Saved state change from {tx["hash"]} in database')
-                else:
-                    logger.debug(f'State change: No state in tx {tx["hash"]}')
-
-    def save_current_state_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                if 'state' in tx:
-                    for kv in tx['state']:
-                        key = kv['key']
-                        value = kv['value']
-
-                        if type(value) is dict:
-                            value = next(iter(value.values()))
-
-                        self.db.execute(
-                            'current_state_insert',
-                            {'txh': tx['hash'], 'k': key, 'v': value, 's': json.dumps(kv)})
-
-                    logger.debug(f'Saved current state from {tx["hash"]} in database')
-                else:
-                    logger.debug(f'Current state: No state in tx {tx["hash"]}')
-
-    def save_contract_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                pld = tx['transaction']['payload']
-                con = pld['contract']
-                fun = pld['function']
-
-                if con == 'submission' and fun == 'submit_contract':
-                    kwargs = pld['kwargs']
-                    code = kwargs['code']
-                    name = kwargs['name']
-
-                    lst1 = self.is_lst001(code)
-                    lst2 = self.is_lst002(code)
-
-                    self.db.execute(
-                        'contracts_insert',
-                        {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2})
-
-                    logger.debug(f'Saved contract {name} in database')
-
-    def save_address_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                pld = tx['transaction']['payload']
-                sender = pld['sender']
-
-                if utils.is_valid_address(sender):
-                    self.db.execute('addresses_insert', {'a': sender})
-                    logger.debug(f'Saving address in database: {sender}')
-
-                if 'kwargs' in pld:
-                    if 'to' in pld['kwargs']:
-                        to = pld['kwargs']['to']
-                        if utils.is_valid_address(to):
-                            self.db.execute('addresses_insert', {'a': to})
-                            logger.debug(f'Saving address in database: {to}')
-
-    def sync_blocks(self, start: int = None, end: int = None):
-        start_time = timer()
-
-        start = start if start else self.cfg.get('block_current')
-        end = end if end else self.cfg.get('block_latest')
-
-        to_sync = list(range(start + 1, end + 1))
-        missing = self.cfg.get('blocks_missing')
-        invalid = self.cfg.get('blocks_invalid')
-
-        to_sync.extend(missing)
-        to_sync.sort(key=int)
-
-        if not to_sync:
-            logger.debug(f'Sync job --> Synchronized!')
-            return
-
-        logger.debug(f'Sync job --> Started...')
-        logger.debug(f'Missing: {missing}')
-        logger.debug(f'To Sync: {to_sync}')
-        logger.debug(f'Invalid: {invalid}')
-
-        sleep_for = self.cfg.get('block_sync_wait')
-
-        missing = list()
-        for block_num in to_sync:
-            time.sleep(sleep_for)
-            logger.debug(f'Syncing block {block_num}...')
-
-            if block_num in invalid:
-                logger.debug(f'Skipping invalid block {block_num}')
-                continue
-
-            _, block = self.get_block(block_num)
-
-            if not block:
-                missing.append(block_num)
-            elif 'error' in block:
-                if block['error'] == 'Block not found.':
-                    invalid.append(block_num)
-                else:
-                    missing.append(block_num)
-            else:
-                self.process_block(block)
-
-        # TODO: Once data is stored in DB, set directly after each block
-        self.cfg.set('block_current', end)
-        self.cfg.set('blocks_missing', missing)
-        self.cfg.set('blocks_invalid', invalid)
-
-        logger.debug(f'Missing: {missing}')
-        logger.debug(f'Invalid: {invalid}')
-        logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
-
-    def is_block_valid(self, response: Response) -> (bool, dict):
-        block_data = response.json()
-
-        if 'error' in block_data:
-            return False, block_data
-        if block_data['hash'] == 'block-does-not-exist':
-            return False, block_data
-
-        return True, block_data
-
-    def get_block(self, block_num: int) -> (bool, dict):
-        for source in self.cfg.get('retrieve_blocks_from'):
-            source = source.replace('{block_num}', str(block_num))
-            logger.debug(f'Retrieving block from {source}')
-
-            try:
-                with r.get(source) as data:
-                    logger.debug(f'Block {block_num} --> {data.text}')
-                    block_valid, block = self.is_block_valid(data)
-
-                    if block_valid:
-                        return block_valid, block
-
-                logger.warning(f'No valid block data...')
-
-            except Exception as e:
-                logger.exception(f'get_block({block_num}) --> {e}')
-
-        logger.error(f'Could not retrieve data for block {block_num}!')
-        return False, None
-
-    def _get_block_without_state(self, d: dict) -> dict:
-        new_d = dict(d)
-
-        if 'state' in new_d:
-            del new_d['state']
-
-        return new_d
-
-    def is_lst001(self, code: str) -> bool:
-        code = code.replace(' ', '')
-
-        if 'balances=Hash(' not in code:
-            logger.debug(f'Contract does not comply with LST001: balances')
-            return False
-        if '@export\ndeftransfer(amount:float,to:str)' not in code:
-            logger.debug(f'Contract does not comply with LST001: transfer')
-            return False
-        if '@export\ndefapprove(amount:float,to:str)' not in code:
-            logger.debug(f'Contract does not comply with LST001: approve')
-            return False
-        if '@export\ndeftransfer_from(amount:float,to:str,main_account:str)' not in code:
-            logger.debug(f'Contract does not comply with LST001: transfer_from')
-            return False
-
-        return True
-
-    def is_lst002(self, code: str) -> bool:
-        code = code.replace(' ', '')
-
-        if 'metadata=Hash(' not in code:
-            logger.debug(f'Contract does not comply with LST002: metadata')
-            return False
-
-        return True
-
 
 if __name__ == "__main__":
     cfg = Config(os.path.join('cfg', 'config.json'))
+    db = DB(cfg)
 
     logger.add(
         os.path.join('log', '{time}.log'),
@@ -352,4 +127,4 @@ if __name__ == "__main__":
         rotation='5 MB',
         diagnose=True)
 
-    BlockHustler(cfg, DB(cfg))
+    BlockHustler(cfg, db, Block(cfg, db))
