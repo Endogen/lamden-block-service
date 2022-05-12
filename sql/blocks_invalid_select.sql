@@ -1,2 +1,0 @@
-SELECT block_num
-FROM blocks_invalid

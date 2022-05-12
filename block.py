@@ -148,6 +148,8 @@ class Block:
         missing = self.db.execute('blocks_missing_select')
         missing = [x[0] for x in missing]
 
+        self.db.execute('blocks_missing_delete')
+
         to_sync.extend(missing)
         to_sync = list(set(to_sync))
         to_sync.sort(key=int)
