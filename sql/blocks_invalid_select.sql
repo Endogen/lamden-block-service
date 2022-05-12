@@ -1,3 +1,2 @@
-SELECT *
+SELECT block_num
 FROM blocks_invalid
-WHERE block_num = %(bn)s

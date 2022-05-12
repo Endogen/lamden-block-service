@@ -1,19 +1,7 @@
 {
-    "block_current": 857903,
-    "block_latest": 857903,
+    "block_current": 858333,
+    "block_latest": 858392,
     "block_sync_wait": 0,
-    "blocks_invalid": [
-        70704,
-        501400,
-        501401,
-        507274,
-        507275,
-        507992,
-        626402,
-        844631,
-        844646
-    ],
-    "blocks_missing": [],
     "db_host": "127.0.0.1",
     "db_name": "lamden_blocks",
     "db_pass": "",

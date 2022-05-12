@@ -17,6 +17,8 @@ class BlockState:
     OK = 3
 
 
+# TODO: When sync from scratch, how do i get invalid blocks into DB?
+# TODO: If current block is 0 (meaning we are just starting to sync for first time), download blocks from GitHub
 class Block:
 
     cfg = None
@@ -143,10 +145,11 @@ class Block:
         end = end if end else self.cfg.get('block_latest')
 
         to_sync = list(range(start + 1, end + 1))
-        missing = self.cfg.get('blocks_missing')
-        invalid = self.cfg.get('blocks_invalid')
+        missing = self.db.execute('blocks_missing_select')
+        missing = [x[0] for x in missing]
 
         to_sync.extend(missing)
+        to_sync = list(set(to_sync))
         to_sync.sort(key=int)
 
         if not to_sync:
@@ -155,31 +158,25 @@ class Block:
 
         logger.debug(f'Missing: {missing}')
         logger.debug(f'To Sync: {to_sync}')
-        logger.debug(f'Invalid: {invalid}')
 
         sleep_for = self.cfg.get('block_sync_wait')
 
-        missing = list()
         for block_num in to_sync:
             time.sleep(sleep_for)
-            logger.debug(f'Syncing block {block_num}...')
 
             state, block = self.get_block(block_num)
 
             if state == BlockState.OK:
                 self.process(block)
             elif state == BlockState.MISSING:
-                missing.append(block_num)
+                self.db.execute('blocks_missing_insert', {'bn': block_num})
+                logger.warning(f'Block {block_num} missing...')
             elif state == BlockState.INVALID:
-                invalid.append(block_num)
+                self.db.execute('blocks_invalid_insert', {'bn': block_num})
+                logger.warning(f'Block {block_num} invalid...')
 
-        # TODO: Once data is stored in DB, set directly after each block
-        self.cfg.set('block_current', end)
-        self.cfg.set('blocks_missing', missing)
-        self.cfg.set('blocks_invalid', invalid)
+            self.cfg.set('block_current', block_num)
 
-        logger.debug(f'Missing: {missing}')
-        logger.debug(f'Invalid: {invalid}')
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_num: int) -> (BlockState, dict):
