@@ -59,7 +59,11 @@ class Block:
         logger.debug(f'Saved block {content["number"]} in database')
 
     def save_transaction_in_db(self, content: dict):
-        for subblock in self._get_block_without_state(content)['subblocks']:
+        content_without_state = dict(content)
+        if 'state' in content_without_state:
+            del content_without_state['state']
+
+        for subblock in content_without_state['subblocks']:
             for tx in subblock['transactions']:
                 self.db.execute(
                     'transactions_insert',
@@ -211,14 +215,6 @@ class Block:
 
         logger.error(f'Could not retrieve block {block_num}!')
         return BlockState.MISSING, None
-
-    def _get_block_without_state(self, d: dict) -> dict:
-        new_d = dict(d)
-
-        if 'state' in new_d:
-            del new_d['state']
-
-        return new_d
 
     def is_lst001(self, code: str) -> bool:
         code = code.replace(' ', '')

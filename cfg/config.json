@@ -1,6 +1,6 @@
 {
-    "block_current": 858419,
-    "block_latest": 858419,
+    "block_current": 858435,
+    "block_latest": 858435,
     "block_sync_wait": 0,
     "db_host": "127.0.0.1",
     "db_name": "lamden_blocks",
