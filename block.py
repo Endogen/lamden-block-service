@@ -164,6 +164,10 @@ class Block:
         for block_num in to_sync:
             time.sleep(sleep_for)
 
+            if self.db.execute('block_exists', {'bn': block_num})[0][0]:
+                logger.debug(f'Block {block_num} exists - skipping...')
+                continue
+
             state, block = self.get_block(block_num)
 
             if block_num in missing and state != BlockState.MISSING:
