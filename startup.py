@@ -127,7 +127,7 @@ if __name__ == "__main__":
         os.path.join('log', '{time}.log'),
         format='{time} {name} {message}',
         level=cfg.get('log_level'),
-        rotation='5 MB',
+        rotation='10 MB',
         diagnose=True)
 
     BlockHustler(cfg, db, Blocks(cfg, db))
