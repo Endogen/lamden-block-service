@@ -74,6 +74,8 @@ class Blocks:
     def save_state_change_in_db(self, content: dict):
         for subblock in content['subblocks']:
             for tx in subblock['transactions']:
+                if tx['status'] == 1:
+                    continue
                 if 'state' in tx:
                     self.db.execute(
                         'state_change_insert',
@@ -86,6 +88,8 @@ class Blocks:
     def save_current_state_in_db(self, content: dict):
         for subblock in content['subblocks']:
             for tx in subblock['transactions']:
+                if tx['status'] == 1:
+                    continue
                 if 'state' in tx:
                     for kv in tx['state']:
                         key = kv['key']
@@ -105,6 +109,9 @@ class Blocks:
     def save_contract_in_db(self, content: dict):
         for subblock in content['subblocks']:
             for tx in subblock['transactions']:
+                if tx['status'] == 1:
+                    continue
+
                 pld = tx['transaction']['payload']
                 con = pld['contract']
                 fun = pld['function']
@@ -126,6 +133,9 @@ class Blocks:
     def save_address_in_db(self, content: dict):
         for subblock in content['subblocks']:
             for tx in subblock['transactions']:
+                if tx['status'] == 1:
+                    continue
+
                 pld = tx['transaction']['payload']
                 sender = pld['sender']
 
