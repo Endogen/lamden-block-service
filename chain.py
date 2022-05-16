@@ -1,12 +1,17 @@
 import os
 import json
 import time
+
 import utils
+import shutil
+import urllib.request
 import requests as r
 
+from pathlib import Path
 from config import Config
 from database import DB
 from loguru import logger
+from urllib.parse import urlparse
 from timeit import default_timer as timer
 
 
@@ -17,9 +22,7 @@ class BlockState:
     OK = 3
 
 
-# TODO: When sync from scratch, how do i get invalid blocks into DB?
-# TODO: If current block is 0 (meaning we are just starting to sync for first time), download blocks from GitHub
-class Block:
+class Chain:
 
     cfg = None
     db = None
@@ -28,23 +31,23 @@ class Block:
         self.cfg = config
         self.db = database
 
-    def process(self, content: dict):
+    def process(self, block: dict):
         start_time = timer()
 
-        self.save_block_in_db(content)
-        self.save_transaction_in_db(content)
-        self.save_state_change_in_db(content)
-        self.save_current_state_in_db(content)
-        self.save_contract_in_db(content)
-        self.save_address_in_db(content)
+        self.save_block_in_db(block)
+        self.save_transaction_in_db(block)
+        self.save_state_change_in_db(block)
+        self.save_current_state_in_db(block)
+        self.save_contract_in_db(block)
+        self.save_address_in_db(block)
 
-        if self.cfg.get('save_to_dir'):
-            self.save_block_in_file(content)
+        if self.cfg.get('block_dir'):
+            self.save_block_in_file(block)
 
-        logger.debug(f'Processed block {content["number"]} in {timer() - start_time} seconds')
+        logger.debug(f'Processed block {block["number"]} in {timer() - start_time} seconds')
 
     def save_block_in_file(self, content: dict):
-        block_dir = self.cfg.get('save_to_dir')
+        block_dir = self.cfg.get('block_dir')
         block_num = content['number']
 
         file = os.path.join(block_dir, f'{block_num}.json')
@@ -114,8 +117,8 @@ class Block:
                     code = kwargs['code']
                     name = kwargs['name']
 
-                    lst1 = self.is_lst001(code)
-                    lst2 = self.is_lst002(code)
+                    lst1 = self.con_is_lst001(code)
+                    lst2 = self.con_is_lst002(code)
 
                     self.db.execute(
                         'contracts_insert',
@@ -148,6 +151,9 @@ class Block:
         start = start if start else self.cfg.get('block_current')
         end = end if end else self.cfg.get('block_latest')
 
+        if start == 0:
+            self.download_blocks(self.cfg.get('block_archive'))
+
         to_sync = list(range(start + 1, end + 1))
         missing = self.db.execute('blocks_missing_select')
         missing = [x[0] for x in missing]
@@ -172,7 +178,10 @@ class Block:
                 logger.debug(f'Block {block_num} exists - skipping...')
                 continue
 
-            state, block = self.get_block(block_num)
+            if start == 0:
+                state, block = self.get_block_from_file(block_num)
+            else:
+                state, block = self.get_block(block_num)
 
             if block_num in missing and state != BlockState.MISSING:
                 self.db.execute('blocks_missing_delete', {'bn': block_num})
@@ -216,7 +225,50 @@ class Block:
         logger.error(f'Could not retrieve block {block_num}!')
         return BlockState.MISSING, None
 
-    def is_lst001(self, code: str) -> bool:
+    def get_block_from_file(self, block_num: int) -> (BlockState, dict):
+        path = os.path.join(self.cfg.get('block_dir'), f'{block_num}.json')
+        logger.debug(f'Retrieving block from {path}')
+
+        if not Path(path).is_file():
+            return BlockState.MISSING, None
+
+        with open(path) as f:
+            block = json.load(f)
+            logger.debug(f'Block {block_num} --> {block}')
+
+            if 'error' in block:
+                logger.warning(f'Invalid block {block_num}')
+                return BlockState.INVALID, block
+            if block['hash'] == 'block-does-not-exist':
+                logger.warning(f'Invalid block {block_num}')
+                return BlockState.INVALID, block
+
+            return BlockState.OK, block
+
+    def download_blocks(self, url: str):
+        if not url:
+            logger.debug(f'Skipping block download - URL empty')
+            return
+
+        start_time = timer()
+        logger.debug(f'Downloading blocks from: {url}')
+
+        with r.get(url, stream=True) as req:
+            parsed_url = urlparse(url)
+            filename = os.path.basename(parsed_url.path)
+
+            with open(filename, 'wb') as f:
+                shutil.copyfileobj(req.raw, f)
+
+        logger.debug(f'Downloading blocks finished in {timer() - start_time} seconds')
+
+        start_time = timer()
+        logger.debug(f'Unzipping block archive: {filename}')
+
+        shutil.unpack_archive(filename=filename, extract_dir=self.cfg.get('block_dir'))
+        logger.debug(f'Unzipping block archive finished in {timer() - start_time} seconds')
+
+    def con_is_lst001(self, code: str) -> bool:
         code = code.replace(' ', '')
 
         if 'balances=Hash(' not in code:
@@ -234,7 +286,7 @@ class Block:
 
         return True
 
-    def is_lst002(self, code: str) -> bool:
+    def con_is_lst002(self, code: str) -> bool:
         code = code.replace(' ', '')
 
         if 'metadata=Hash(' not in code:

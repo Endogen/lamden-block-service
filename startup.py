@@ -5,7 +5,7 @@ import rel
 import json
 import websocket
 
-from block import Block
+from chain import Chain
 from database import DB
 from config import Config
 from threading import Thread
@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
+# TODO: Add Telegram integration to notify about events
 # TODO: Add API for 'TAU forever lost'
 # TODO: Add API for address Toplist (TAU or any other token)
 # TODO: Job to remove logs after some time
@@ -32,7 +33,7 @@ class BlockHustler:
     block = None
     scheduler = None
 
-    def __init__(self, config: Config, database: DB, block: Block):
+    def __init__(self, config: Config, database: DB, block: Chain):
         self.cfg = config
         self.db = database
         self.block = block
@@ -127,4 +128,4 @@ if __name__ == "__main__":
         rotation='5 MB',
         diagnose=True)
 
-    BlockHustler(cfg, db, Block(cfg, db))
+    BlockHustler(cfg, db, Chain(cfg, db))
