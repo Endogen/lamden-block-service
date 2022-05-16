@@ -21,13 +21,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # TODO: Add API for address Toplist (TAU or any other token)
 # TODO: Job to remove logs after some time
 # TODO: Make sure config can be changed without restarting Block Service
-# TODO: Store blocks_missing, blocks_invalid in DB to not accidentally overwrite unrelated data in config
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
 # TODO: Use similar API as default Block Service
-# TODO: Allow importing blocks via file and GitHub
 # TODO: API for total stamps used for address
 # TODO: API for 'network involvement' of an address - how much other addresses transacted with address?
-class BlockHustler:
+class BlockJuggler:
 
     db = None
     cfg = None
@@ -130,4 +128,4 @@ if __name__ == "__main__":
         rotation='10 MB',
         diagnose=True)
 
-    BlockHustler(cfg, db, Blocks(cfg, db))
+    BlockJuggler(cfg, db, Blocks(cfg, db))

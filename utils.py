@@ -1,12 +1,10 @@
-# CLI with Typer to
-# - Sync single block
-# - Range of blocks
-# - Download all blocks from GitHub
-# - Sync old blocks (after download)
-# - Check if all blocks in DB (with 'save_db=True' & 'save_file=True' params)
-# - Check if all blocks on HDD (with 'save_db=True' & 'save_file=True' params)
-# - Needed to create DB??
-# - Put class BlockGrabber in own module so that it can be accessed by utils too
+# TODO: CLI with Typer to
+# TODO: Sync single block
+# TODO: Sync range of blocks
+# TODO: Download all blocks from ...
+# TODO: Check if all blocks are in DB
+# TODO: Check if all blocks on HDD
+# TODO: Needed to create DB??
 
 def is_valid_address(address: str) -> bool:
     """ Check if the given string is a valid Lamden address """
