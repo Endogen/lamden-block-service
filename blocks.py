@@ -4,7 +4,6 @@ import time
 
 import utils
 import shutil
-import urllib.request
 import requests as r
 
 from pathlib import Path
@@ -16,14 +15,12 @@ from timeit import default_timer as timer
 
 
 class BlockState:
-
     MISSING = 1
     INVALID = 2
     OK = 3
 
 
-class Chain:
-
+class Blocks:
     cfg = None
     db = None
 
@@ -41,7 +38,7 @@ class Chain:
         self.save_contract_in_db(block)
         self.save_address_in_db(block)
 
-        if self.cfg.get('block_dir'):
+        if self.cfg.get('save_blocks_to_file') and not self.cfg.get('sync_from_file'):
             self.save_block_in_file(block)
 
         logger.debug(f'Processed block {block["number"]} in {timer() - start_time} seconds')
@@ -55,7 +52,7 @@ class Chain:
 
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(content, f, sort_keys=True, indent=4)
-            logger.debug(f'Saved block {block_num} in file')
+            logger.debug(f'Saved block {block_num} to file')
 
     def save_block_in_db(self, content: dict):
         self.db.execute('blocks_insert', {'bn': content['number'], 'b': json.dumps(content)})
@@ -153,6 +150,7 @@ class Chain:
 
         if start == 0:
             self.download_blocks(self.cfg.get('block_archive'))
+            self.cfg.set('sync_from_file', True)
 
         to_sync = list(range(start + 1, end + 1))
         missing = self.db.execute('blocks_missing_select')
@@ -178,7 +176,7 @@ class Chain:
                 logger.debug(f'Block {block_num} exists - skipping...')
                 continue
 
-            if start == 0:
+            if self.cfg.get('sync_from_file'):
                 state, block = self.get_block_from_file(block_num)
             else:
                 state, block = self.get_block(block_num)
@@ -198,6 +196,7 @@ class Chain:
             self.cfg.set('block_current', block_num)
 
         self.cfg.set('block_current', end)
+        if self.cfg.get('sync_from_file'): self.cfg.set('sync_from_file', False)
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_num: int) -> (BlockState, dict):
@@ -247,16 +246,15 @@ class Chain:
 
     def download_blocks(self, url: str):
         if not url:
-            logger.debug(f'Skipping block download - URL empty')
+            logger.debug(f'Skipping downloading blocks - No URL')
             return
 
         start_time = timer()
         logger.debug(f'Downloading blocks from: {url}')
 
-        with r.get(url, stream=True) as req:
-            parsed_url = urlparse(url)
-            filename = os.path.basename(parsed_url.path)
+        filename = os.path.basename(urlparse(url).path)
 
+        with r.get(url, stream=True) as req:
             with open(filename, 'wb') as f:
                 shutil.copyfileobj(req.raw, f)
 
