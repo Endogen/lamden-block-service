@@ -2,6 +2,7 @@ import gc
 import os
 import time
 import rel
+import sys
 import json
 import websocket
 
@@ -120,6 +121,12 @@ class BlockJuggler:
 if __name__ == "__main__":
     cfg = Config(os.path.join('cfg', 'config.json'))
     db = DB(cfg)
+
+    logger.remove()
+
+    logger.add(
+        sys.stderr,
+        level=cfg.get('log_level'))
 
     logger.add(
         os.path.join('log', 'bj_{time}.log'),
