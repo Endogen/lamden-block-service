@@ -122,7 +122,7 @@ if __name__ == "__main__":
     db = DB(cfg)
 
     logger.add(
-        os.path.join('log', '{time}.log'),
+        os.path.join('log', 'bj_{time}.log'),
         format='{time} {name} {message}',
         level=cfg.get('log_level'),
         rotation='10 MB',
