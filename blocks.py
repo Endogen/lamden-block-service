@@ -233,6 +233,7 @@ class Blocks:
         logger.debug(f'Retrieving block from {path}')
 
         if not Path(path).is_file():
+            logger.warning(f'Missing block {block_num}')
             return BlockState.MISSING, None
 
         with open(path) as f:
