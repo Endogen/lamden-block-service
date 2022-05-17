@@ -92,15 +92,9 @@ class Blocks:
                     continue
                 if 'state' in tx:
                     for kv in tx['state']:
-                        key = kv['key']
-                        value = kv['value']
-
-                        if type(value) is dict:
-                            value = next(iter(value.values()))
-
                         self.db.execute(
                             'current_state_insert',
-                            {'txh': tx['hash'], 'k': key, 'v': value, 's': json.dumps(kv)})
+                            {'txh': tx['hash'], 'k': kv['key'], 'v': json.dumps(kv['value'])})
 
                     logger.debug(f'Saved current state from {tx["hash"]} in database')
                 else:
