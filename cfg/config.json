@@ -15,7 +15,6 @@
     "notify_telegram": [
         134166731
     ],
-    "reconnect_after": 10,
     "remove_logs_after": 7,
     "retrieve_blocks_from": [
         "https://blockservice.nebulamden.finance/blocks/{block_num}",
@@ -23,6 +22,8 @@
         "https://masternode-01.lamden.io/blocks?num={block_num}"
     ],
     "save_blocks_to_file": true,
-    "sync_from_file": true,
-    "wss_masternode": "wss://masternode-01.lamden.io"
+    "sync_from_file": false,
+    "ws_masternode": "wss://masternode-01.lamden.io",
+    "ws_reconnect": 10,
+    "ws_timeout": 5
 }

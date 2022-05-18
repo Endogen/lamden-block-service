@@ -67,7 +67,9 @@ class BlockJuggler:
     def __init_websocket(self):
         while True:
             try:
-                ws = websocket.WebSocketApp(self.cfg.get('wss_masternode'),
+                logger.info(f'Initiating websocket connection...')
+                websocket.setdefaulttimeout(self.cfg.get('ws_timeout'))
+                ws = websocket.WebSocketApp(self.cfg.get('ws_masternode'),
                     on_message=lambda ws, msg: self.on_message(ws, msg),
                     on_error=lambda ws, msg: self.on_error(ws, msg),
                     on_close=lambda ws, code, msg: self.on_close(ws, code, msg),
@@ -77,14 +79,15 @@ class BlockJuggler:
                 self.wst.daemon = True
                 self.wst.start()
 
+                logger.info('Dispatching...')
                 rel.signal(2, rel.abort)
                 rel.dispatch()
             except Exception as e:
                 logger.exception(f'Websocket connection error: {e}')
                 gc.collect()
 
-            wait_secs = self.cfg.get('reconnect_after')
-            logger.debug(f'Reconnecting after {wait_secs} seconds')
+            wait_secs = self.cfg.get('ws_reconnect')
+            logger.info(f'Reconnecting after {wait_secs} seconds')
             time.sleep(wait_secs)
 
     def decode_event(self, message: str) -> (str, str):
