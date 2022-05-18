@@ -2,7 +2,7 @@
     "block_archive": null,
     "block_current": 0,
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-main",
-    "block_latest": 860136,
+    "block_latest": 860459,
     "block_sync_wait": 0,
     "db_host": "127.0.0.1",
     "db_name": "lamden_blocks",
@@ -11,6 +11,7 @@
     "db_user": "endogen",
     "job_interval_sync": 10,
     "log_level": "DEBUG",
+    "log_retention": 3,
     "notify_telegram": [
         134166731
     ],

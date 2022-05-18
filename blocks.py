@@ -153,8 +153,8 @@ class Blocks:
         end = end if end else self.cfg.get('block_latest')
 
         if start == 0:
-            self.download_blocks(self.cfg.get('block_archive'))
-            self.cfg.set('sync_from_file', True)
+            if self.download_blocks(self.cfg.get('block_archive')):
+                self.cfg.set('sync_from_file', True)
 
         to_sync = list(range(start + 1, end + 1))
         missing = self.db.execute('blocks_missing_select')
@@ -252,24 +252,30 @@ class Blocks:
     def download_blocks(self, url: str):
         if not url:
             logger.debug(f'Skipping downloading blocks - No URL')
-            return
+            return False
 
-        start_time = timer()
-        logger.debug(f'Downloading blocks from: {url}')
+        try:
+            start_time = timer()
+            logger.debug(f'Downloading blocks from: {url}')
 
-        filename = os.path.basename(urlparse(url).path)
+            filename = os.path.basename(urlparse(url).path)
 
-        with r.get(url, stream=True) as req:
-            with open(filename, 'wb') as f:
-                shutil.copyfileobj(req.raw, f)
+            with r.get(url, stream=True) as req:
+                with open(filename, 'wb') as f:
+                    shutil.copyfileobj(req.raw, f)
 
-        logger.debug(f'Downloading blocks finished in {timer() - start_time} seconds')
+            logger.debug(f'Downloading blocks finished in {timer() - start_time} seconds')
 
-        start_time = timer()
-        logger.debug(f'Unzipping block archive: {filename}')
+            start_time = timer()
+            logger.debug(f'Unzipping block archive: {filename}')
 
-        shutil.unpack_archive(filename=filename, extract_dir=self.cfg.get('block_dir'))
-        logger.debug(f'Unzipping block archive finished in {timer() - start_time} seconds')
+            shutil.unpack_archive(filename=filename, extract_dir=self.cfg.get('block_dir'))
+            logger.debug(f'Unzipping block archive finished in {timer() - start_time} seconds')
+        except Exception as e:
+            logger.exception(f'Downloading blocks failed: {e}')
+            return False
+
+        return True
 
     def con_is_lst001(self, code: str) -> bool:
         code = code.replace(' ', '')
