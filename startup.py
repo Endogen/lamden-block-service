@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
+# TODO: Add script to stop execution
 # TODO: Add Telegram integration to notify about events
 # TODO: Make sure config can be changed without restarting Block Service
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
