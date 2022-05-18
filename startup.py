@@ -15,17 +15,9 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: API: Subscribe to state changes
-# TODO: API: Which contract holds which funds?
 # TODO: Add Telegram integration to notify about events
-# TODO: Add API for 'TAU forever lost'
-# TODO: Add API for address Toplist (TAU or any other token)
-# TODO: Job to remove logs after some time
 # TODO: Make sure config can be changed without restarting Block Service
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
-# TODO: Use similar API as default Block Service
-# TODO: API for total stamps used for address
-# TODO: API for 'network involvement' of an address - how much other addresses transacted with address?
 class BlockJuggler:
 
     db = None
@@ -130,6 +122,7 @@ if __name__ == "__main__":
 
     logger.add(
         os.path.join('log', 'bj_{time}.log'),
+        retention=timedelta(days=cfg.get('log_retention')),
         format='{time} {name} {message}',
         level=cfg.get('log_level'),
         rotation='10 MB',
