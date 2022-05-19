@@ -95,7 +95,7 @@ class BlockJuggler:
         return event['event'], event['data']
 
     def on_message(self, ws, message):
-        logger.debug(f'New event --> {message}')
+        logger.info(f'New event --> {message}')
         event, block = self.decode_event(message)
 
         if event == 'latest_block':

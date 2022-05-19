@@ -20,7 +20,7 @@ class Config:
 
     def get(self, key, load=False):
         if load: self.load()
-        return self._cfg[key] if self._cfg[key] else None
+        return self._cfg[key] if key in self._cfg else None
 
     def set(self, key, value, dump=True):
         self._cfg[key] = value

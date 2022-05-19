@@ -210,7 +210,7 @@ class Blocks:
 
             try:
                 with r.get(source) as data:
-                    logger.debug(f'Block {block_num} --> {data.text}')
+                    logger.info(f'Block {block_num} --> {data.text}')
 
                     block = data.json()
 

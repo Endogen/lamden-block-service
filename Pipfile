@@ -11,6 +11,8 @@ apscheduler = "*"
 rel = "*"
 requests = "*"
 psycopg2 = "*"
+fastapi = "*"
+uvicorn = "*"
 
 [dev-packages]
 
