@@ -2,8 +2,8 @@
     "api_host": "0.0.0.0",
     "api_port": 8000,
     "block_archive": null,
-    "block_current": 0,
-    "block_dir": null,
+    "block_current": 860839,
+    "block_dir": "/Users/endogen/Projekte/lamden-blocks-main",
     "block_latest": 860839,
     "block_sync_wait": 0,
     "db_host": "127.0.0.1",
@@ -14,18 +14,19 @@
     "job_interval_sync": 10,
     "log_level": "INFO",
     "log_retention": 3,
-    "notify_telegram": [
-        134166731
-    ],
+    "telegram_notify": 134166731,
     "remove_logs_after": 7,
     "retrieve_blocks_from": [
         "https://blockservice.nebulamden.finance/blocks/{block_num}",
-        "https://blockservice.rubixdao.com/blocks/{block_num}",
-        "https://masternode-01.lamden.io/blocks?num={block_num}"
+        "https://blockservice.rubixdao.com/blocks/{block_num}"
     ],
-    "save_blocks_to_file": false,
+    "save_blocks_to_file": true,
     "sync_from_file": false,
     "ws_masternode": "wss://masternode-01.lamden.io",
     "ws_reconnect": 10,
-    "ws_timeout": 5
+    "ws_timeout": 5,
+    "tg_read_timeout": 5000,
+    "tg_connect_timeout": 30,
+    "tg_con_pool_size": 5,
+    "tg_token": "some_telegram_bot_token"
 }

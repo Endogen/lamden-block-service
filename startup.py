@@ -6,6 +6,7 @@ import sys
 import json
 import websocket
 
+from tgbot import TelegramBot
 from blocks import Blocks
 from database import DB
 from config import Config
@@ -24,13 +25,15 @@ class BlockJuggler:
     db = None
     cfg = None
     wst = None
+    bot = None
     block = None
     scheduler = None
 
-    def __init__(self, config: Config, database: DB, block: Blocks):
+    def __init__(self, config: Config, database: DB, block: Blocks, tgbot: TelegramBot):
         self.cfg = config
         self.db = database
         self.block = block
+        self.bot = tgbot
 
         self.__init_db()
         self.__init_sync()
@@ -83,7 +86,9 @@ class BlockJuggler:
                 rel.signal(2, rel.abort)
                 rel.dispatch()
             except Exception as e:
-                logger.exception(f'Websocket connection error: {e}')
+                msg = f'Websocket connection error: {e}'
+                logger.exception(msg)
+                self.bot.send(msg)
                 gc.collect()
 
             wait_secs = self.cfg.get('ws_reconnect')
@@ -132,4 +137,4 @@ if __name__ == "__main__":
         rotation='10 MB',
         diagnose=True)
 
-    BlockJuggler(cfg, db, Blocks(cfg, db))
+    BlockJuggler(cfg, db, Blocks(cfg, db), TelegramBot(cfg))

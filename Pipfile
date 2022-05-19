@@ -13,6 +13,7 @@ requests = "*"
 psycopg2 = "*"
 fastapi = "*"
 uvicorn = "*"
+python-telegram-bot = "*"
 
 [dev-packages]
 
