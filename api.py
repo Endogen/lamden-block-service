@@ -91,24 +91,27 @@ def read_root():
 
 @app.get("/balances/{address}")
 def balances(address: str):
-    balances = db.execute('balances_select')
+    result = db.execute('balances_select', {'a': f'%balances:{address}'})
+    logger.debug(f'RESULT: {result}')
+    tokens = dict()
 
-    for balance in balances:
-        contract = balance[0].replace('.balances:ae7d14d6d9b8443f881ba6244727b69b681010e782d4fe482dbfb0b6aca02d5d', '')
-
+    for balance in result:
+        contract = balance[0].split('.')[0]
         amount = balance[1]
+
         if type(amount) is dict and len(amount) == 1 and '__fixed__' in amount:
             amount = amount['__fixed__']
-
         if float(amount) == 0:
             continue
 
-        print(contract, amount)
+        tokens[contract] = amount
+
+    return tokens
 
 
 @app.get("/state_snapshot")
-def balances():
-    db.execute()
+def balance(address: str, contract: str):
+    pass
 
 
 uvicorn.run(app, host=cfg.get('api_host'), port=cfg.get('api_port'))
