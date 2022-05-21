@@ -100,6 +100,23 @@ def db_size():
     return size[0][0]
 
 
+# TODO: Split into 'addresses' and 'contracts' and sort by balance and show balance
+@app.get("/holders/{contract}")
+def holders(contract: str):
+    logger.debug(f'API ENTRY: holders({contract})')
+
+    holders = db.execute('holders_select', {'l': f'{contract}.balances%'})
+    logger.debug(f'API RESULT: {holders}')
+
+    holder_list = list()
+    for holder in holders:
+        holder_split = holder[0].split(':')
+        if len(holder_split) == 2:
+            holder_list.append(holder_split[1])
+
+    return holder_list
+
+
 @app.get("/balance/{address}")
 def balance(address: str, contract: str = None):
     logger.debug(f'API ENTRY: balance({address}, {contract})')
@@ -133,7 +150,10 @@ def state(contract: str = None):
     logger.debug(f'API ENTRY: state({contract})')
 
     if contract:
-        pass
+        result = db.execute('state_contract_select', {'l': f'{contract}'})
+        logger.debug(f'API RESULT: {result}')
+
+
     else:
         result = db.execute('state_select')
         logger.debug(f'API RESULT: {result}')
