@@ -1,6 +1,7 @@
 import os
 import sys
 import uvicorn
+import utils
 
 from config import Config
 from database import DB
@@ -89,29 +90,53 @@ def read_root():
     """
 
 
-@app.get("/balances/{address}")
-def balances(address: str):
-    result = db.execute('balances_select', {'a': f'%balances:{address}'})
-    logger.debug(f'RESULT: {result}')
-    tokens = dict()
+@app.get("/db-size")
+def db_size():
+    logger.debug(f'API ENTRY: db_size()')
 
-    for balance in result:
-        contract = balance[0].split('.')[0]
-        amount = balance[1]
+    size = db.execute('size_select', {'db': cfg.get('db_name')})
+    logger.debug(f'API RESULT: {size}')
 
-        if type(amount) is dict and len(amount) == 1 and '__fixed__' in amount:
-            amount = amount['__fixed__']
-        if float(amount) == 0:
-            continue
-
-        tokens[contract] = amount
-
-    return tokens
+    return size[0][0]
 
 
-@app.get("/state_snapshot")
-def balance(address: str, contract: str):
-    pass
+@app.get("/balance/{address}")
+def balance(address: str, contract: str = None):
+    logger.debug(f'API ENTRY: balance({address}, {contract})')
+
+    if contract:
+        result = db.execute('balance_select', {'a': f'{contract}.balances:{address}'})
+        logger.debug(f'API RESULT: {result}')
+
+        amount = utils.unwrap_fixed(result[0][0])
+        return float(amount)
+    else:
+        result = db.execute('balances_select', {'a': f'%balances:{address}'})
+        logger.debug(f'API RESULT: {result}')
+
+        tokens = dict()
+
+        for token in result:
+            contract = token[0].split('.')[0]
+            amount = utils.unwrap_fixed(token[1])
+
+            if float(amount) == 0:
+                continue
+            else:
+                tokens[contract] = amount
+
+        return tokens
+
+
+@app.get("/state")
+def state(contract: str = None):
+    logger.debug(f'API ENTRY: state({contract})')
+
+    if contract:
+        pass
+    else:
+        result = db.execute('state_select')
+        logger.debug(f'API RESULT: {result}')
 
 
 uvicorn.run(app, host=cfg.get('api_host'), port=cfg.get('api_port'))
