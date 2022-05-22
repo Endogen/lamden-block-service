@@ -19,6 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # TODO: Add API for address Toplist (TAU or any other token)
 # TODO: API to subscribe to state changes
 # TODO: API for which contract holds which funds
+# TODO: https://stackoverflow.com/questions/1237725/copying-postgresql-database-to-another-server
+# TODO: https://github.com/ultrajson/ultrajson
 
 app = FastAPI(title='BlockJuggler API')
 

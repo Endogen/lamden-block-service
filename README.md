@@ -11,3 +11,33 @@ from current_state
 select state::json->'value'
 from current_state
 ```
+
+Install on Ubuntu
+`sudo apt-get install postgresql`
+
+Start DB instance
+`pg_ctlcluster 12 main start`
+
+Login to psql command line tool
+`sudo -u postgres psql`
+
+Create role for application, give login and CREATEDB permissions
+```
+postgres-# CREATE ROLE myuser WITH LOGIN;
+postgres-# ALTER ROLE myuser CREATEDB;
+```
+
+Quit psql for postgres user
+`\q`
+
+Login as newly created user
+`psql postgres -U myuser`
+
+Create database
+`CREATE DATABASE lamden_mainnet;`
+
+Grant all privileges to new user
+`GRANT ALL PRIVILEGES ON DATABASE mydatabase TO myuser;`
+
+Quit
+`\q`

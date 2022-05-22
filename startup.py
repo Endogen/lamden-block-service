@@ -5,6 +5,7 @@ import rel
 import sys
 import json
 import websocket
+import utils
 
 from tgbot import TelegramBot
 from blocks import Blocks
@@ -16,8 +17,6 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: Add script to stop execution
-# TODO: Add Telegram integration to notify about events
 # TODO: Make sure config can be changed without restarting Block Service
 # TODO: Look at every get / set for cfg and decide if load() / dump() is needed
 class BlockJuggler:
@@ -120,6 +119,8 @@ class BlockJuggler:
 
 
 if __name__ == "__main__":
+    utils.create_kill_script('stop')
+
     cfg = Config(os.path.join('cfg', 'config.json'))
     db = DB(cfg)
 
