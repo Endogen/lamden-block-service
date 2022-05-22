@@ -2,9 +2,9 @@
     "api_host": "0.0.0.0",
     "api_port": 8000,
     "block_archive": null,
-    "block_current": 863793,
+    "block_current": 864031,
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-main",
-    "block_latest": 863793,
+    "block_latest": 864031,
     "block_sync_wait": 0,
     "db_host": "127.0.0.1",
     "db_name": "lamden_blocks",
@@ -14,7 +14,6 @@
     "job_interval_sync": 10,
     "log_level": "DEBUG",
     "log_retention": 3,
-    "remove_logs_after": 7,
     "retrieve_blocks_from": [
         "https://blockservice.nebulamden.finance/blocks/{block_num}",
         "https://blockservice.rubixdao.com/blocks/{block_num}"
@@ -25,7 +24,7 @@
     "tg_con_pool_size": 5,
     "tg_connect_timeout": 30,
     "tg_read_timeout": 5000,
-    "tg_token": "some_telegram_bot_token",
+    "tg_token": "5322297431:AAEvR6RmCZ-RvcreMtqmXZEHFOmA1qMCUso",
     "ws_masternode": "wss://masternode-01.lamden.io",
     "ws_reconnect": 10,
     "ws_timeout": 5
