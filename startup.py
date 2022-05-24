@@ -39,19 +39,23 @@ class BlockJuggler:
         self.__init_websocket()
 
     def __init_db(self):
-        result = self.db.execute('db_exists', {'name': 'lamden_blocks'})
+        try:
+            result = self.db.execute('db_exists', {'name': 'lamden_blocks'})
 
-        if result and result[0][0] != 1:
-            self.db.execute('db_create', {'name': 'lamden_blocks'})
+            if result and result[0][0] != 1:
+                self.db.execute('db_create', {'name': 'lamden_blocks'})
 
-        self.db.execute('blocks_create')
-        self.db.execute('blocks_invalid_create')
-        self.db.execute('blocks_missing_create')
-        self.db.execute('transactions_create')
-        self.db.execute('state_change_create')
-        self.db.execute('current_state_create')
-        self.db.execute('contracts_create')
-        self.db.execute('addresses_create')
+            self.db.execute('blocks_create')
+            self.db.execute('blocks_invalid_create')
+            self.db.execute('blocks_missing_create')
+            self.db.execute('transactions_create')
+            self.db.execute('state_change_create')
+            self.db.execute('current_state_create')
+            self.db.execute('contracts_create')
+            self.db.execute('addresses_create')
+        except Exception as e:
+            logger.exception(e)
+            raise SystemExit
 
     def __init_sync(self):
         self.scheduler = BackgroundScheduler(timezone="Europe/Berlin")
