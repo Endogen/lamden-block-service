@@ -1,9 +1,12 @@
 def create_kill_script(path: str):
     import os
 
+    bang = '#!/bin/bash'
+    kill = f'kill -9 {os.getpid()}'
+
     with open(path, 'w') as f:
         f.truncate(0)
-        f.write(f'{"#!/bin/bash"}\n\n{"kill -9 {os.getpid()}"}')
+        f.write(f'{bang}\n\n{kill}')
 
     mode = os.stat(path).st_mode
     mode |= (mode & 0o444) >> 2
