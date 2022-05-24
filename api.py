@@ -3,10 +3,10 @@ import sys
 import uvicorn
 import utils
 
+from pathlib import Path
 from config import Config
 from database import DB
 from loguru import logger
-from typing import Union
 from fastapi import FastAPI
 from datetime import timedelta
 from fastapi.responses import HTMLResponse
@@ -51,45 +51,9 @@ logger.add(
 
 
 @app.get("/", response_class=HTMLResponse)
-def read_root():
-    return """
-    <html>
-    <head>
-        <style>
-        div {
-            width: 320px;
-            height: 320px;
-            --lg: linear-gradient(135deg, #fff 50%, transparent 0);
-            background:
-                var(--lg) 0 0 / 100% 100%,
-                var(--lg) 0 0 / 50% 50%,
-                var(--lg) 0 0 / 25% 25%,
-                var(--lg) 0 0 / 12.5% 12.5%,
-                var(--lg) 0 0 / 6.25% 6.25%,
-                var(--lg) 0 0 / 3.125% 3.125%;
-            background-color: #000;
-            mask: linear-gradient(-45deg, #000 50%, transparent 0);
-            transform: skew(27deg) translateX(-25%);
-        }
-
-        html,
-        body {
-            height: 100%;
-            margin: 0;
-            display: grid;
-            place-items: center;
-        }
-
-        div {
-            will-change: transform;
-        }
-        </style>
-    </head>
-    <body>
-        <div></div>
-    </body>
-    </html>
-    """
+def root():
+    with open(Path('res', 'index.html'), 'r', encoding='utf-8') as f:
+        return f.read().replace('\n', '')
 
 
 @app.get("/db-size")
