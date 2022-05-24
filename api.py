@@ -44,7 +44,7 @@ logger.add(
 logger.add(
     os.path.join('log', 'api_{time}.log'),
     retention=timedelta(days=cfg.get('log_retention')),
-    format='{time} {name} {message}',
+    format='{time} {level} {name} {message}',
     level=cfg.get('log_level'),
     rotation='10 MB',
     diagnose=True)
