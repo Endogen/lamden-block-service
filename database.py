@@ -60,6 +60,7 @@ class DB:
         except Exception as e:
             if 'no results to fetch' not in str(e):
                 logger.exception(f'Error while executing SQL: {e}')
+                raise e
 
         finally:
             if cur: cur.close()
