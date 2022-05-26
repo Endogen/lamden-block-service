@@ -1,7 +1,5 @@
 [Install PostgreSQL on macOS](https://gist.github.com/phortuin/2fe698b6c741fd84357cec84219c6667)
 
-Create database `lamden_mainnet`
-
 Retrieve KEY or VALUE from state
 
 ```
@@ -13,7 +11,7 @@ from current_state
 ```
 
 Install necessary packages
-`sudo apt -y install gnupg2 wget vim`
+`sudo apt -y install gnupg2 wget`
 
 Add the repository that provides PostgreSQL 14 on Ubuntu 20.04|18.04
 `sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'`
@@ -39,6 +37,9 @@ postgres-# CREATE ROLE myuser WITH LOGIN;
 postgres-# ALTER ROLE myuser CREATEDB;
 ```
 
+Set password for user
+`\password myuser`
+
 Quit psql for postgres user
 `\q`
 
@@ -54,5 +55,29 @@ Grant all privileges to new user
 Quit
 `\q`
 
-???
+Listen on all addresses
+`listen_addresses = '*'`
+
+Set who can connect
 `sudo nano /etc/postgresql/14/main/pg_hba.conf`
+`local   all             endogen                                 trust`
+
+or
+
+`local   all             endogen                                 peer`
+
+
+Reload config
+`sudo -u postgres psql`
+`SELECT pg_reload_conf();`
+`\q`
+
+or
+
+`sudo systemctl restart postgresql@14-main.service`
+
+Start with PM2 (in base folder)
+`pm2 start "pipenv run python startup.py" --name "lamden-block-service"`
+
+Monitor
+`pm2 monit`
