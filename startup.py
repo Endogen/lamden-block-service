@@ -17,8 +17,6 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-# TODO: Make sure config can be changed without restarting Block Service
-# TODO: Look at every get / set for cfg and decide if load() / dump() is needed
 class BlockJuggler:
 
     db = None
