@@ -211,22 +211,16 @@ class Blocks:
             try:
                 with r.get(source) as data:
                     logger.info(f'Block {block_num} --> {data.text}')
+                    state, block = self.get_block_state(block_num, data.json())
 
-                    block = data.json()
+                    if state == BlockState.OK:
+                        return state, block
 
-                    if 'error' in block:
-                        logger.warning(f'Invalid block {block_num}')
-                        return BlockState.INVALID, block
-                    if block['hash'] == 'block-does-not-exist':
-                        logger.warning(f'Invalid block {block_num}')
-                        return BlockState.INVALID, block
-
-                    return BlockState.OK, block
             except Exception as e:
                 logger.exception(f'get_block({block_num}) --> {e}')
 
         logger.error(f'Could not retrieve block {block_num}!')
-        return BlockState.MISSING, None
+        return BlockState.INVALID, None
 
     def get_block_from_file(self, block_num: int) -> (BlockState, dict):
         path = os.path.join(self.cfg.get('block_dir'), f'{block_num}.json')
@@ -238,16 +232,18 @@ class Blocks:
 
         with open(path) as f:
             block = json.load(f)
+
             logger.debug(f'Block {block_num} --> {block}')
+            return self.get_block_state(block_num, block)
 
-            if 'error' in block:
-                logger.warning(f'Invalid block {block_num}')
-                return BlockState.INVALID, block
-            if block['hash'] == 'block-does-not-exist':
-                logger.warning(f'Invalid block {block_num}')
-                return BlockState.INVALID, block
-
-            return BlockState.OK, block
+    def get_block_state(self, block_num: int, block: dict) -> (BlockState, dict):
+        if 'error' in block:
+            logger.warning(f'Invalid block {block_num}')
+            return BlockState.INVALID, block
+        if block['hash'] == 'block-does-not-exist':
+            logger.warning(f'Invalid block {block_num}')
+            return BlockState.INVALID, block
+        return BlockState.OK, block
 
     def download_blocks(self, url: str):
         if not url:
