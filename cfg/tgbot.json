@@ -1,0 +1,6 @@
+{
+    "con_pool_size": 5,
+    "connect_timeout": 30,
+    "read_timeout": 5000,
+    "token": "5322297431:AAFAYvWwbu-ubqH_bkB96PQvTMnmPLWfY-A"
+}
