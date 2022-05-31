@@ -15,9 +15,9 @@ class TelegramBot:
     def __init__(self, config: Config):
         self.cfg = config
 
-        read_timeout = self.cfg.get("tg_read_timeout")
-        connect_timeout = self.cfg.get("tg_connect_timeout")
-        con_pool_size = self.cfg.get("tg_con_pool_size")
+        read_timeout = self.cfg.get("read_timeout")
+        connect_timeout = self.cfg.get("connect_timeout")
+        con_pool_size = self.cfg.get("con_pool_size")
 
         self.tgb_kwargs = dict()
 
@@ -30,7 +30,7 @@ class TelegramBot:
 
         try:
             logger.info("Connecting bot...")
-            self.updater = Updater(self.cfg.get("tg_token"), request_kwargs=self.tgb_kwargs)
+            self.updater = Updater(self.cfg.get("token"), request_kwargs=self.tgb_kwargs)
             logger.info("Checking bot token...")
             self.updater.bot.get_me()
         except (InvalidToken, Unauthorized) as e:
