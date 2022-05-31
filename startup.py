@@ -8,7 +8,7 @@ import websocket
 import utils
 
 from tgbot import TelegramBot
-from blocks import Blocks
+from sync import Sync
 from database import DB
 from config import Config
 from threading import Thread
@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-class BlockJuggler:
+class LamdenSync:
 
     db = None
     cfg = None
@@ -26,7 +26,7 @@ class BlockJuggler:
     block = None
     scheduler = None
 
-    def __init__(self, config: Config, database: DB, block: Blocks, tgbot: TelegramBot):
+    def __init__(self, config: Config, database: DB, block: Sync, tgbot: TelegramBot):
         self.cfg = config
         self.db = database
         self.block = block
@@ -41,6 +41,7 @@ class BlockJuggler:
             result = self.db.execute('db_exists', {'name': 'lamden_blocks'})
 
             if result and result[0][0] != 1:
+                # TODO: Does DB creation work automatically?
                 self.db.execute('db_create', {'name': 'lamden_blocks'})
 
             self.db.execute('blocks_create')
@@ -79,9 +80,7 @@ class BlockJuggler:
                     on_close=lambda ws, code, msg: self.on_close(ws, code, msg),
                     on_open=lambda ws: self.on_open(ws))
 
-                self.wst = Thread(target=ws.run_forever, kwargs={'dispatcher': rel})
-                self.wst.daemon = True
-                self.wst.start()
+                self.wst = ws.run_forever(dispatcher=rel)
 
                 logger.info('Dispatching...')
                 rel.signal(2, rel.abort)
@@ -123,7 +122,7 @@ class BlockJuggler:
 if __name__ == "__main__":
     utils.create_kill_script('stop')
 
-    cfg = Config(os.path.join('cfg', 'config.json'))
+    cfg = Config(os.path.join('cfg', 'sync.json'))
     db = DB(cfg)
 
     logger.remove()
@@ -133,11 +132,16 @@ if __name__ == "__main__":
         level=cfg.get('log_level'))
 
     logger.add(
-        os.path.join('log', 'bj_{time}.log'),
+        os.path.join('log', 'syn_{time}.log'),
         retention=timedelta(days=cfg.get('log_retention')),
         format='{time} {level} {name} {message}',
         level=cfg.get('log_level'),
         rotation='10 MB',
-        diagnose=True)
+        diagnose=False)
 
-    BlockJuggler(cfg, db, Blocks(cfg, db), TelegramBot(cfg))
+    LamdenSync(
+        cfg,
+        db,
+        Sync(cfg, db),
+        TelegramBot(Config(os.path.join('cfg', 'tgbot.json')))
+    )
