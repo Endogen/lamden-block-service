@@ -1,24 +1,23 @@
 import os
 import sys
 import typer
+import sql
 
 from typing import List
 from loguru import logger
-from blocks import Blocks
+from sync import Sync
 from config import Config
 from database import DB
 from datetime import timedelta
+from sync import State
 
-# TODO: Sync single block
-# TODO: Sync range of blocks
 # TODO: Download all blocks from ...
 # TODO: Check if all blocks are in DB
 # TODO: Check if all blocks on HDD
-# TODO: Does DB creation work automatically?
 
 app = typer.Typer()
 
-cfg = Config(os.path.join('cfg', 'config.json'))
+cfg = Config(os.path.join('cfg', 'cli.json'))
 db = DB(cfg)
 
 logger.remove()
@@ -35,19 +34,62 @@ logger.add(
     rotation='10 MB',
     diagnose=True)
 
-blocks = Blocks(cfg, db)
+sync = Sync(Config(os.path.join('cfg', 'sync.json')), db)
 
 
 @app.command()
-def sync_block(block_nums: List[int]):
+def sync_blocks(block_nums: List[int]):
     for block_num in block_nums:
-        state, block = blocks.get_block(block_num)
-        blocks.process(block)
+        state, block = sync.get_block(block_num)
+
+        if state == State.OK:
+            sync.process(block)
 
 
 @app.command()
 def sync_block_range(from_block_num: int, to_block_num: int):
-    print(f'Syncing blocks from {from_block_num} to {to_block_num}')
+    for block_num in range(from_block_num, to_block_num + 1):
+        state, block = sync.get_block(block_num)
+
+        if state == State.OK:
+            sync.process(block)
+
+
+@app.command()
+def sync_blocks_from(start_block_num: int):
+    for block_num in range(start_block_num, sync.cfg.get('block_latest') + 1):
+        state, block = sync.get_block(block_num)
+
+        if state == State.OK:
+            sync.process(block)
+
+
+@app.command()
+def sync_missing_blocks():
+    missing = sync.db.execute(sql.select_missing_blocks())
+    missing = [x[0] for x in missing]
+    missing = list(set(missing))
+    missing.sort(key=int)
+
+    for block_num in missing:
+        state, block = sync.get_block(block_num)
+
+        if state == State.OK:
+            sync.process(block)
+
+
+@app.command()
+def sync_invalid_blocks():
+    missing = sync.db.execute(sql.select_invalid_blocks())
+    missing = [x[0] for x in missing]
+    missing = list(set(missing))
+    missing.sort(key=int)
+
+    for block_num in missing:
+        state, block = sync.get_block(block_num)
+
+        if state == State.OK:
+            sync.process(block)
 
 
 app()
