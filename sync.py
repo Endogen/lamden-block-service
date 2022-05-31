@@ -14,13 +14,13 @@ from urllib.parse import urlparse
 from timeit import default_timer as timer
 
 
-class BlockState:
+class State:
     MISSING = 1
     INVALID = 2
     OK = 3
 
 
-class Blocks:
+class Sync:
     cfg = None
     db = None
 
@@ -171,10 +171,10 @@ class Blocks:
         logger.debug(f'Missing: {missing}')
         logger.debug(f'To Sync: {to_sync}')
 
-        sleep_for = self.cfg.get('block_sync_wait')
+        time_to_sleep = self.cfg.get('block_sync_wait')
 
         for block_num in to_sync:
-            time.sleep(sleep_for)
+            time.sleep(time_to_sleep)
 
             if self.db.execute('block_exists', {'bn': block_num})[0][0]:
                 logger.debug(f'Block {block_num} exists - skipping...')
@@ -185,15 +185,15 @@ class Blocks:
             else:
                 state, block = self.get_block(block_num)
 
-            if block_num in missing and state != BlockState.MISSING:
+            if block_num in missing and state != State.MISSING:
                 self.db.execute('blocks_missing_delete', {'bn': block_num})
 
-            if state == BlockState.OK:
+            if state == State.OK:
                 self.process(block)
-            elif state == BlockState.MISSING:
+            elif state == State.MISSING:
                 self.db.execute('blocks_missing_insert', {'bn': block_num})
                 logger.warning(f'Block {block_num} missing...')
-            elif state == BlockState.INVALID:
+            elif state == State.INVALID:
                 self.db.execute('blocks_invalid_insert', {'bn': block_num})
                 logger.warning(f'Block {block_num} invalid...')
 
@@ -203,7 +203,7 @@ class Blocks:
         if self.cfg.get('sync_from_file'): self.cfg.set('sync_from_file', False)
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
-    def get_block(self, block_num: int) -> (BlockState, dict):
+    def get_block(self, block_num: int) -> (State, dict):
         for source in self.cfg.get('retrieve_blocks_from'):
             source = source.replace('{block_num}', str(block_num))
             logger.debug(f'Retrieving block from {source}')
@@ -211,39 +211,39 @@ class Blocks:
             try:
                 with r.get(source) as data:
                     logger.info(f'Block {block_num} --> {data.text}')
-                    state, block = self.get_block_state(block_num, data.json())
+                    state, block = self.get_block_state(data.json())
 
-                    if state == BlockState.OK:
+                    if state == State.OK:
                         return state, block
 
             except Exception as e:
                 logger.exception(f'get_block({block_num}) --> {e}')
 
         logger.error(f'Could not retrieve block {block_num}!')
-        return BlockState.INVALID, None
+        return State.INVALID, None
 
-    def get_block_from_file(self, block_num: int) -> (BlockState, dict):
+    def get_block_from_file(self, block_num: int) -> (State, dict):
         path = os.path.join(self.cfg.get('block_dir'), f'{block_num}.json')
         logger.debug(f'Retrieving block from {path}')
 
         if not Path(path).is_file():
             logger.warning(f'Missing block {block_num}')
-            return BlockState.MISSING, None
+            return State.MISSING, None
 
         with open(path) as f:
             block = json.load(f)
 
             logger.debug(f'Block {block_num} --> {block}')
-            return self.get_block_state(block_num, block)
+            return self.get_block_state(block)
 
-    def get_block_state(self, block_num: int, block: dict) -> (BlockState, dict):
+    def get_block_state(self, block: dict) -> (State, dict):
         if 'error' in block:
-            logger.warning(f'Invalid block {block_num}')
-            return BlockState.INVALID, block
+            logger.warning(f'Invalid block!')
+            return State.INVALID, block
         if block['hash'] == 'block-does-not-exist':
-            logger.warning(f'Invalid block {block_num}')
-            return BlockState.INVALID, block
-        return BlockState.OK, block
+            logger.warning(f'Invalid block!')
+            return State.INVALID, block
+        return State.OK, block
 
     def download_blocks(self, url: str):
         if not url:
