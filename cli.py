@@ -11,7 +11,6 @@ from database import DB
 from datetime import timedelta
 from sync import State
 
-# TODO: Download all blocks from ...
 # TODO: Check if all blocks are in DB
 # TODO: Check if all blocks on HDD
 
