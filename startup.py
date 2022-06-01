@@ -38,12 +38,6 @@ class LamdenSync:
 
     def __init_db(self):
         try:
-            result = self.db.execute('db_exists', {'name': 'lamden_blocks'})
-
-            if result and result[0][0] != 1:
-                # TODO: Does DB creation work automatically?
-                self.db.execute('db_create', {'name': 'lamden_blocks'})
-
             self.db.execute('blocks_create')
             self.db.execute('blocks_invalid_create')
             self.db.execute('blocks_missing_create')
