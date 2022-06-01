@@ -1,10 +1,8 @@
 {
-    "api_host": "0.0.0.0",
-    "api_port": 8000,
     "block_archive": null,
     "block_current": 0,
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-main",
-    "block_latest": 867666,
+    "block_latest": 867908,
     "block_sync_wait": 0,
     "db_host": "127.0.0.1",
     "db_name": "lamden_blocks",
@@ -17,6 +15,7 @@
     "retrieve_blocks_from": [
         "https://blockservice.nebulamden.finance/blocks/{block_num}",
         "https://blockservice.rubixdao.com/blocks/{block_num}",
+        "https://blockservice.undergroundwarriors.io/blocks/{block_num}",
         "https://masternode-01.lamden.io/blocks?num={block_num}"
     ],
     "save_blocks_to_file": true,
