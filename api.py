@@ -147,4 +147,4 @@ def contracts(contract: str = None, lst001: str = None, lst002: str = None):
     return result
 
 
-uvicorn.run(app, host=cfg.get('api_host'), port=cfg.get('api_port'))
+uvicorn.run(app, host=cfg.get('host'), port=cfg.get('port'))
