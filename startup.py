@@ -72,9 +72,14 @@ class LamdenSync:
                     on_message=lambda ws, msg: self.on_message(ws, msg),
                     on_error=lambda ws, msg: self.on_error(ws, msg),
                     on_close=lambda ws, code, msg: self.on_close(ws, code, msg),
-                    on_open=lambda ws: self.on_open(ws))
+                    on_open=lambda ws: self.on_open(ws),
+                    on_ping=lambda ws, msg: self.on_ping(ws, msg),
+                    on_pong=lambda ws, msg: self.on_pong(ws, msg))
 
-                self.wst = ws.run_forever(dispatcher=rel)
+                self.wst = ws.run_forever(
+                    dispatcher=rel,
+                    ping_interval=self.cfg.get('ws_ping_interval'),
+                    ping_timeout=self.cfg.get('ws_ping_timeout'))
 
                 logger.info('Dispatching...')
                 rel.signal(2, rel.abort)
@@ -93,9 +98,9 @@ class LamdenSync:
         event = json.loads(message)
         return event['event'], event['data']
 
-    def on_message(self, ws, message):
-        logger.info(f'New event --> {message}')
-        event, block = self.decode_event(message)
+    def on_message(self, ws, msg):
+        logger.info(f'New event --> {msg}')
+        event, block = self.decode_event(msg)
 
         if event == 'latest_block':
             self.cfg.set('block_latest', block['number'])
@@ -103,14 +108,20 @@ class LamdenSync:
             self.cfg.set('block_latest', block['number'])
             Thread(target=self.block.process, args=[block]).start()
 
-    def on_error(self, ws, error):
-        logger.debug(error)
+    def on_ping(self, ws, msg):
+        logger.debug(f'Websocket connection got a PING')
 
-    def on_close(self, ws, close_status_code, close_msg):
-        logger.debug("Websocket connection closed")
+    def on_pong(self, ws, msg):
+        logger.debug(f'Websocket connection got a PONG')
+
+    def on_error(self, ws, error):
+        logger.error(f'Websocket connection error: {error}')
+
+    def on_close(self, ws, status_code, msg):
+        logger.info(f'Websocket connection closed with code {status_code} and message {msg}')
 
     def on_open(self, ws):
-        logger.debug("Opened websocket connection")
+        logger.info("Websocket connection opened")
 
 
 if __name__ == "__main__":

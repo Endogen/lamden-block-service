@@ -2,7 +2,7 @@
     "block_archive": null,
     "block_current": 0,
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-main",
-    "block_latest": 867908,
+    "block_latest": 868918,
     "block_sync_wait": 0,
     "db_host": "127.0.0.1",
     "db_name": "lamden_blocks",
@@ -22,6 +22,8 @@
     "sync_from_file": false,
     "telegram_notify": 134166731,
     "ws_masternode": "wss://masternode-01.lamden.io",
+    "ws_ping_interval": 10,
+    "ws_ping_timeout": 5,
     "ws_reconnect": 10,
     "ws_timeout": 5
 }
