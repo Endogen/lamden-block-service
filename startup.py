@@ -23,13 +23,13 @@ class LamdenSync:
     cfg = None
     wst = None
     bot = None
-    block = None
+    sync = None
     scheduler = None
 
-    def __init__(self, config: Config, database: DB, block: Sync, tgbot: TelegramBot):
+    def __init__(self, config: Config, database: DB, snyc: Sync, tgbot: TelegramBot):
         self.cfg = config
         self.db = database
-        self.block = block
+        self.sync = snyc
         self.bot = tgbot
 
         self.__init_db()
@@ -54,7 +54,7 @@ class LamdenSync:
         self.scheduler = BackgroundScheduler(timezone="Europe/Berlin")
 
         self.scheduler.add_job(
-            self.block.sync,
+            self.sync.sync,
             name="sync_blocks",
             trigger='interval',
             seconds=self.cfg.get('job_interval_sync'),
@@ -106,7 +106,7 @@ class LamdenSync:
             self.cfg.set('block_latest', block['number'])
         elif event == 'new_block':
             self.cfg.set('block_latest', block['number'])
-            Thread(target=self.block.process, args=[block]).start()
+            Thread(target=self.sync.process, args=[block]).start()
 
     def on_ping(self, ws, msg):
         logger.debug(f'Websocket connection got a PING')
