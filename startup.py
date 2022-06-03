@@ -120,8 +120,8 @@ class LamdenSync:
 if __name__ == "__main__":
     utils.create_kill_script('stop')
 
-    cfg = Config(os.path.join('cfg', 'sync.json'))
-    db = DB(cfg)
+    db = DB(Config('cfg', 'db.json'))
+    cfg = Config('cfg', 'sync.json')
 
     logger.remove()
 
@@ -140,4 +140,4 @@ if __name__ == "__main__":
         cfg,
         db,
         Sync(cfg, db),
-        TelegramBot(Config(os.path.join('cfg', 'tgbot.json'))))
+        TelegramBot(Config('cfg', 'tgbot.json')))

@@ -36,8 +36,8 @@ app.add_middleware(
     allow_credentials=True
 )
 
-cfg = Config(os.path.join('cfg', 'api.json'))
-db = DB(cfg)
+db = DB(Config('cfg', 'db.json'))
+cfg = Config('cfg', 'api.json')
 
 logger.remove()
 

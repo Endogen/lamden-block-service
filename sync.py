@@ -171,11 +171,7 @@ class Sync:
         logger.debug(f'Missing: {missing}')
         logger.debug(f'To Sync: {to_sync}')
 
-        time_to_sleep = self.cfg.get('block_sync_wait')
-
         for block_num in to_sync:
-            time.sleep(time_to_sleep)
-
             if self.db.execute('block_exists', {'bn': block_num})[0][0]:
                 logger.debug(f'Block {block_num} exists - skipping...')
                 continue
@@ -204,12 +200,19 @@ class Sync:
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_num: int) -> (State, dict):
-        for source in self.cfg.get('retrieve_blocks_from'):
-            source = source.replace('{block_num}', str(block_num))
-            logger.debug(f'Retrieving block from {source}')
+        for source in self.cfg.get('retrieve_state_from'):
+            host = source['host']
+            wait = source['wait']
+
+            if wait:
+                logger.debug(f'Waiting for {wait} seconds...')
+                time.sleep(wait)
+
+            host = host.replace('{block_num}', str(block_num))
+            logger.debug(f'Retrieving block from {host}')
 
             try:
-                with r.get(source) as data:
+                with r.get(host) as data:
                     logger.info(f'Block {block_num} --> {data.text}')
                     state, block = self.get_block_state(data.json())
 

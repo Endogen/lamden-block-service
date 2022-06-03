@@ -14,10 +14,9 @@ from sync import State
 # TODO: Check if all blocks are in DB
 # TODO: Check if all blocks on HDD
 
+db = DB(Config('cfg', 'db.json'))
+cfg = Config('cfg', 'cli.json')
 app = typer.Typer()
-
-cfg = Config(os.path.join('cfg', 'cli.json'))
-db = DB(cfg)
 
 logger.remove()
 
