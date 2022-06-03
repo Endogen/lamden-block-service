@@ -1,7 +1,6 @@
 import gc
 import os
 import time
-import rel
 import sys
 import json
 import websocket
@@ -55,7 +54,7 @@ class LamdenSync:
 
         self.scheduler.add_job(
             self.sync.sync,
-            name="sync_blocks",
+            name="sync_state",
             trigger='interval',
             seconds=self.cfg.get('job_interval_sync'),
             next_run_time=datetime.now() + timedelta(seconds=5),
@@ -77,30 +76,24 @@ class LamdenSync:
                     on_pong=lambda ws, msg: self.on_pong(ws, msg))
 
                 self.wst = ws.run_forever(
-                    dispatcher=rel,
                     ping_interval=self.cfg.get('ws_ping_interval'),
                     ping_timeout=self.cfg.get('ws_ping_timeout'))
 
-                logger.info('Dispatching...')
-                rel.signal(2, rel.abort)
-                rel.dispatch()
             except Exception as e:
-                msg = f'Websocket connection error: {e}'
+                msg = f'Websocket error: {e}'
                 logger.exception(msg)
                 self.bot.send(msg)
                 gc.collect()
 
             wait_secs = self.cfg.get('ws_reconnect')
-            logger.info(f'Reconnecting after {wait_secs} seconds')
+            logger.info(f'Websocket reconnect after {wait_secs} seconds')
             time.sleep(wait_secs)
-
-    def decode_event(self, message: str) -> (str, str):
-        event = json.loads(message)
-        return event['event'], event['data']
 
     def on_message(self, ws, msg):
         logger.info(f'New event --> {msg}')
-        event, block = self.decode_event(msg)
+
+        json_msg = json.loads(msg)
+        event, block = json_msg['event'], json_msg['data']
 
         if event == 'latest_block':
             self.cfg.set('block_latest', block['number'])
@@ -109,13 +102,13 @@ class LamdenSync:
             Thread(target=self.sync.process, args=[block]).start()
 
     def on_ping(self, ws, msg):
-        logger.debug(f'Websocket connection got a PING')
+        logger.debug(f'Websocket got a PING')
 
     def on_pong(self, ws, msg):
-        logger.debug(f'Websocket connection got a PONG')
+        logger.debug(f'Websocket got a PONG')
 
     def on_error(self, ws, error):
-        logger.error(f'Websocket connection error: {error}')
+        logger.error(f'Websocket error: {error}')
 
     def on_close(self, ws, status_code, msg):
         logger.info(f'Websocket connection closed with code {status_code} and message {msg}')
@@ -141,12 +134,10 @@ if __name__ == "__main__":
         retention=timedelta(days=cfg.get('log_retention')),
         format='{time} {level} {name} {message}',
         level=cfg.get('log_level'),
-        rotation='10 MB',
-        diagnose=False)
+        rotation='10 MB')
 
     LamdenSync(
         cfg,
         db,
         Sync(cfg, db),
-        TelegramBot(Config(os.path.join('cfg', 'tgbot.json')))
-    )
+        TelegramBot(Config(os.path.join('cfg', 'tgbot.json'))))
