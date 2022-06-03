@@ -1,3 +1,4 @@
+import os
 import json
 
 
@@ -6,8 +7,8 @@ class Config:
     _cfg = None
     _cfg_file = None
 
-    def __init__(self, cfg_file: str):
-        self._cfg_file = cfg_file
+    def __init__(self, *cfg_path: str):
+        self._cfg_file = os.path.join(*cfg_path)
         self.load()
 
     def load(self):
