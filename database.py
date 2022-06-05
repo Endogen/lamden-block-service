@@ -6,7 +6,6 @@ from config import Config
 from psycopg2 import OperationalError
 
 
-# TODO: Convert to factory so that different databases can be used - based on config
 class DB:
 
     cfg = None
