@@ -66,27 +66,19 @@ def db_size():
 
     try:
         logger.debug(f'API ENTRY: db_size()')
-        result = db.execute_raw(sql.db_size(cfg.get('db_name')))
+        result = db.execute_raw(sql.select_db_size(cfg.get('db_name')))
         logger.debug(f'API RESULT after {timer() - start:.4f} seconds: {result}')
         return result[0][1]
     except Exception as e:
         return {'error': str(e)}
 
 
-# TODO: Split into 'addresses' and 'contracts' and sort by balance and show balance
 @app.get("/holders/{contract}")
-def holders(contract: str, addresses: bool = True, contracts: bool = True, top: int = 0):
-    logger.debug(f'API ENTRY: holders({contract}, {addresses}, {contracts}, {top})')
-    result = db.execute_raw(sql)
+def holders(contract: str, addresses: bool = True, contracts: bool = True, limit: int = 0):
+    logger.debug(f'API ENTRY: holders({contract}, {addresses}, {contracts}, {limit})')
+    result = db.execute_raw(sql.select_holders(contract, addresses, contracts, limit))
     logger.debug(f'API RESULT: {result}')
-
-    holder_list = list()
-    for holder in result:
-        holder_split = holder[0].split(':')
-        if len(holder_split) == 2:
-            holder_list.append(holder_split[1])
-
-    return holder_list
+    return result
 
 
 @app.get("/balance/{address}")
