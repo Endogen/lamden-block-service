@@ -26,6 +26,7 @@ def is_valid_address(address: str) -> bool:
     return True
 
 
+# TODO: Still needed?
 def unwrap_fixed(value: str) -> str:
     if type(value) is dict and len(value) == 1 and '__fixed__' in value:
         return value['__fixed__']
