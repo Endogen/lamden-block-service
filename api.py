@@ -13,6 +13,7 @@ from datetime import timedelta
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from timeit import default_timer as timer
+from tgbot import TelegramBot
 
 # TODO: Search contract code contains
 # TODO: Total burned amount for token
@@ -36,6 +37,7 @@ app.add_middleware(
     allow_credentials=True
 )
 
+bot = TelegramBot(Config('cfg', 'tgbot.json'))
 db = DB(Config('cfg', 'db.json'))
 cfg = Config('cfg', 'api.json')
 
@@ -68,45 +70,55 @@ def db_size():
         logger.debug(f'API ENTRY: db_size()')
         result = db.execute_raw(sql.select_db_size(cfg.get('db_name')))
         logger.debug(f'API RESULT after {timer() - start:.4f} seconds: {result}')
+
         return result[0][1]
+
     except Exception as e:
+        bot.send(str(e))
         return {'error': str(e)}
 
 
 @app.get("/holders/{contract}")
 def holders(contract: str, addresses: bool = True, contracts: bool = True, limit: int = 0):
-    logger.debug(f'API ENTRY: holders({contract}, {addresses}, {contracts}, {limit})')
-    result = db.execute_raw(sql.select_holders(contract, addresses, contracts, limit))
-    logger.debug(f'API RESULT: {result}')
-    return result
+    start = timer()
+
+    try:
+        logger.debug(f'API ENTRY: holders({contract}, {addresses}, {contracts}, {limit})')
+        result = db.execute_raw(sql.select_holders(contract, addresses, contracts, limit))
+        logger.debug(f'API RESULT after {timer() - start:.4f} seconds: {result}')
+
+        return result
+
+    except Exception as e:
+        bot.send(str(e))
+        return {'error': str(e)}
 
 
 @app.get("/balance/{address}")
 def balance(address: str, contract: str = None):
+    start = timer()
+
     logger.debug(f'API ENTRY: balance({address}, {contract})')
 
-    if contract:
-        result = db.execute('balance_select', {'a': f'{contract}.balances:{address}'})
-        logger.debug(f'API RESULT: {result}')
+    try:
+        if contract:
+            result = db.execute_raw(sql.select_balance(address, contract))
+            logger.debug(f'API RESULT after: {timer() - start:.4f} seconds: {result}')
 
-        amount = utils.unwrap_fixed(result[0][0])
-        return float(amount)
-    else:
-        result = db.execute('balances_select', {'a': f'%balances:{address}'})
-        logger.debug(f'API RESULT: {result}')
-
-        tokens = dict()
-
-        for token in result:
-            contract = token[0].split('.')[0]
-            amount = utils.unwrap_fixed(token[1])
-
-            if float(amount) == 0:
-                continue
+            if result and result[0] and result[0][0]:
+                return float(result[0][0])
             else:
-                tokens[contract] = amount
+                return 0
 
-        return tokens
+        else:
+            result = db.execute_raw(sql.select_balances(address))
+            logger.debug(f'API RESULT after: {timer() - start:.4f} seconds: {result}')
+
+            return result
+
+    except Exception as e:
+        bot.send(str(e))
+        return {'error': str(e)}
 
 
 @app.get("/state")
