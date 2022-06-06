@@ -22,9 +22,23 @@ def select_holders(contract: str, addresses: bool = True, contracts: bool = True
            f"{top}"
 
 
+def select_balance(address: str, contract: str = None):
+    return f"SELECT (CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) " \
+           f"FROM current_state WHERE key LIKE '{contract}.balances:{address}'"
+
+
+# TODO: Remove balances with '0'
+# TODO: return only contract name, not whole string
+def select_balances(address: str):
+    return f"SELECT key, (CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) " \
+           f"FROM current_state " \
+           f"WHERE key LIKE '%balances:{address}' " \
+           f"ORDER BY key"
+
+
 def select_missing_blocks():
-    return 'SELECT block_num FROM blocks_missing'
+    return "SELECT block_num FROM blocks_missing"
 
 
 def select_invalid_blocks():
-    return 'SELECT block_num FROM blocks_invalid'
+    return "SELECT block_num FROM blocks_invalid"
