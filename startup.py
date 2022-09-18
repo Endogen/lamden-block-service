@@ -16,6 +16,10 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
+# TODO: Switch to Poetry
+# TODO: Add possibility to integrate DB dump to start syncing fast
+# TODO: Add async block sync pool - distribute block numbers to sync jobs
+
 class LamdenSync:
 
     db = None
