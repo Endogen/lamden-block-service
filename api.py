@@ -1,7 +1,6 @@
 import os
 import sys
 import uvicorn
-import utils
 import sql
 
 from pathlib import Path
@@ -10,11 +9,12 @@ from database import DB
 from loguru import logger
 from fastapi import FastAPI
 from datetime import timedelta
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from timeit import default_timer as timer
 from tgbot import TelegramBot
 
+# TODO: Make all functions async with 'async def'
 # TODO: Search contract code contains
 # TODO: Total burned amount for token
 # TODO: API for total stamps used for address
@@ -27,6 +27,7 @@ from tgbot import TelegramBot
 # TODO: https://stackoverflow.com/questions/1237725/copying-postgresql-database-to-another-server
 # TODO: https://github.com/ultrajson/ultrajson
 
+# TODO: Set real name
 app = FastAPI(title='BlockJuggler API')
 
 app.add_middleware(
@@ -56,7 +57,13 @@ logger.add(
     diagnose=True)
 
 
-@app.get("/", response_class=HTMLResponse)
+# TOOD: Why is the favicon not showing?
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return FileResponse(Path('res', 'favicon.ico'))
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def root():
     with open(Path('res', 'index.html'), 'r', encoding='utf-8') as f:
         return f.read().replace('\n', '')
