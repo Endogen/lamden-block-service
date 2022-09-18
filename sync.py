@@ -117,10 +117,11 @@ class Sync:
 
                     lst1 = self.con_is_lst001(code)
                     lst2 = self.con_is_lst002(code)
+                    lst3 = self.con_is_lst003(code)
 
                     self.db.execute(
                         'contracts_insert',
-                        {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2})
+                        {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2, 'l3': lst3})
 
                     logger.debug(f'Saved contract {name} in database')
 
@@ -280,25 +281,47 @@ class Sync:
         code = code.replace(' ', '')
 
         if 'balances=Hash(' not in code:
-            logger.debug(f'Contract does not comply with LST001: balances')
             return False
-        if '@export\ndeftransfer(amount:float,to:str)' not in code:
-            logger.debug(f'Contract does not comply with LST001: transfer')
+        if '@export\ndeftransfer(amount:float,to:str):' not in code:
             return False
-        if '@export\ndefapprove(amount:float,to:str)' not in code:
-            logger.debug(f'Contract does not comply with LST001: approve')
+        if '@export\ndefapprove(amount:float,to:str):' not in code:
             return False
-        if '@export\ndeftransfer_from(amount:float,to:str,main_account:str)' not in code:
-            logger.debug(f'Contract does not comply with LST001: transfer_from')
+        if '@export\ndeftransfer_from(amount:float,to:str,main_account:str):' not in code:
             return False
 
+        logger.debug('Contract is LST001 compatible')
         return True
 
     def con_is_lst002(self, code: str) -> bool:
         code = code.replace(' ', '')
 
         if 'metadata=Hash(' not in code:
-            logger.debug(f'Contract does not comply with LST002: metadata')
             return False
 
+        logger.debug('Contract is LST002 compatible')
+        return True
+
+    def con_is_lst003(self, code: str) -> bool:
+        code = code.replace(' ', '')
+
+        if 'collection_name=Variable()' not in code:
+            return False
+        if 'collection_owner=Variable()' not in code:
+            return False
+        if 'collection_nfts=Hash(' not in code:
+            return False
+        if 'collection_balances=Hash(' not in code:
+            return False
+        if 'collection_balances_approvals=Hash(' not in code:
+            return False
+        if '@export\ndefmint_nft(name:str,description:str,ipfs_image_url:str,metadata:dict,amount:int):' not in code:
+            return False
+        if '@export\ndeftransfer(name:str,amount:int,to:str):' not in code:
+            return False
+        if '@export\ndefapprove(amount:int,name:str,to:str):' not in code:
+            return False
+        if '@export\ndeftransfer_from(name:str,amount:int,to:str,main_account:str):' not in code:
+            return False
+
+        logger.debug('Contract is LST003 compatible')
         return True
