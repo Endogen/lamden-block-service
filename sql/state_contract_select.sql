@@ -1,3 +1,3 @@
 SELECT key, value
 FROM current_state
-WHERE key LIKE %(a)s
+WEHRE key LIKE %(l)s

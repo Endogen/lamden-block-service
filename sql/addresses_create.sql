@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS addresses (
-  address text NOT NULL PRIMARY KEY,
-  created TIMESTAMP NOT NULL DEFAULT now()
-)

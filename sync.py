@@ -1,4 +1,5 @@
 import os
+import sql
 import json
 import time
 
@@ -55,7 +56,7 @@ class Sync:
             logger.debug(f'Saved block {block_num} to file')
 
     def save_block_in_db(self, content: dict):
-        self.db.execute('blocks_insert', {'bn': content['number'], 'b': json.dumps(content)})
+        self.db.execute(sql.insert_block(content['number'], json.dumps(content)))
         logger.debug(f'Saved block {content["number"]} in database')
 
     def save_transaction_in_db(self, content: dict):
@@ -65,9 +66,10 @@ class Sync:
 
         for subblock in content_without_state['subblocks']:
             for tx in subblock['transactions']:
-                self.db.execute(
-                    'transactions_insert',
-                    {'h': tx['hash'], 't': json.dumps(tx), 'b': content['number']})
+                self.db.execute(sql.insert_transaction(
+                    tx['hash'],
+                    json.dumps(tx),
+                    content['number']))
 
                 logger.debug(f'Saved transaction {tx["hash"]} in database')
 
@@ -77,10 +79,7 @@ class Sync:
                 if tx['status'] == 1:
                     continue
                 if 'state' in tx:
-                    self.db.execute(
-                        'state_change_insert',
-                        {'txh': tx['hash'], 's': json.dumps(tx['state'])})
-
+                    self.db.execute(sql.insert_state_change(tx['hash'], json.dumps(tx['state'])))
                     logger.debug(f'Saved state change from {tx["hash"]} in database')
                 else:
                     logger.debug(f'State change: No state in tx {tx["hash"]}')
@@ -92,9 +91,10 @@ class Sync:
                     continue
                 if 'state' in tx:
                     for kv in tx['state']:
-                        self.db.execute(
-                            'current_state_insert',
-                            {'txh': tx['hash'], 'k': kv['key'], 'v': json.dumps(kv['value'])})
+                        self.db.execute(sql.insert_current_state(
+                            tx['hash'],
+                            kv['key'],
+                            json.dumps(kv['value'])))
 
                     logger.debug(f'Saved current state from {tx["hash"]} in database')
                 else:
@@ -119,9 +119,13 @@ class Sync:
                     lst2 = self.con_is_lst002(code)
                     lst3 = self.con_is_lst003(code)
 
-                    self.db.execute(
-                        'contracts_insert',
-                        {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2, 'l3': lst3})
+                    self.db.execute(sql.insert_contract(
+                        tx['hash'],
+                        name,
+                        code,
+                        lst1,
+                        lst2,
+                        lst3))
 
                     logger.debug(f'Saved contract {name} in database')
 
@@ -135,14 +139,14 @@ class Sync:
                 sender = pld['sender']
 
                 if utils.is_valid_address(sender):
-                    self.db.execute('addresses_insert', {'a': sender})
+                    self.db.execute(sql.insert_address(sender))
                     logger.debug(f'Saving address in database: {sender}')
 
                 if 'kwargs' in pld:
                     if 'to' in pld['kwargs']:
                         to = pld['kwargs']['to']
                         if utils.is_valid_address(to):
-                            self.db.execute('addresses_insert', {'a': to})
+                            self.db.execute(sql.insert_address(to))
                             logger.debug(f'Saving address in database: {to}')
 
     def sync(self, start: int = None, end: int = None):
@@ -158,7 +162,7 @@ class Sync:
                 self.cfg.set('sync_from_file', True)
 
         to_sync = list(range(start + 1, end + 1))
-        missing = self.db.execute('blocks_missing_select')
+        missing = self.db.execute(sql.select_missing_blocks())
         missing = [x[0] for x in missing]
 
         to_sync.extend(missing)
@@ -173,7 +177,7 @@ class Sync:
         logger.debug(f'To Sync: {to_sync}')
 
         for block_num in to_sync:
-            if self.db.execute('block_exists', {'bn': block_num})[0][0]:
+            if self.db.execute(sql.block_exists(block_num))[0][0]:
                 logger.debug(f'Block {block_num} exists - skipping...')
                 continue
 
@@ -183,15 +187,15 @@ class Sync:
                 state, block = self.get_block(block_num)
 
             if block_num in missing and state != State.MISSING:
-                self.db.execute('blocks_missing_delete', {'bn': block_num})
+                self.db.execute(sql.delete_missing_blocks(block_num))
 
             if state == State.OK:
                 self.process(block)
             elif state == State.MISSING:
-                self.db.execute('blocks_missing_insert', {'bn': block_num})
+                self.db.execute(sql.insert_missing_blocks(block_num))
                 logger.warning(f'Block {block_num} missing...')
             elif state == State.INVALID:
-                self.db.execute('blocks_invalid_insert', {'bn': block_num})
+                self.db.execute(sql.insert_invalid_blocks(block_num))
                 logger.warning(f'Block {block_num} invalid...')
 
             self.cfg.set('block_current', block_num)

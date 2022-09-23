@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS blocks_invalid (
-  block_num SERIAL NOT NULL PRIMARY KEY,
-  created TIMESTAMP NOT NULL DEFAULT now()
-)

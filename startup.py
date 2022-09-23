@@ -1,5 +1,6 @@
 import gc
 import os
+import sql
 import time
 import sys
 import json
@@ -41,14 +42,14 @@ class LamdenSync:
 
     def __init_db(self):
         try:
-            self.db.execute('blocks_create')
-            self.db.execute('blocks_invalid_create')
-            self.db.execute('blocks_missing_create')
-            self.db.execute('transactions_create')
-            self.db.execute('state_change_create')
-            self.db.execute('current_state_create')
-            self.db.execute('contracts_create')
-            self.db.execute('addresses_create')
+            self.db.execute(sql.create_blocks())
+            self.db.execute(sql.create_blocks_invalid())
+            self.db.execute(sql.create_blocks_missing())
+            self.db.execute(sql.create_transactions())
+            self.db.execute(sql.create_state_change())
+            self.db.execute(sql.create_current_state())
+            self.db.execute(sql.create_contracts())
+            self.db.execute(sql.create_addresses())
         except Exception as e:
             logger.exception(e)
             raise SystemExit

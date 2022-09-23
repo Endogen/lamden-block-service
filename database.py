@@ -40,20 +40,14 @@ class DB:
         except OperationalError as e:
             logger.exception(f'Error while connecting to DB: {e}')
 
-    def _sql(self, file):
-        with open(os.path.join('sql', file), 'r', encoding='utf8') as f:
-            return f.read()
-
-    def execute(self, name: str, params: dict = None):
+    def execute(self, query: str, params: dict = None):
         con = cur = None
 
         try:
             con = self._connect()
             cur = con.cursor()
 
-            query = self._sql(f'{name}.sql')
             cur.execute(query, params)
-
             return cur.fetchall()
 
         except Exception as e:

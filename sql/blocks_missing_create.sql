@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS blocks_missing (
-  block_num SERIAL NOT NULL PRIMARY KEY,
-  created TIMESTAMP NOT NULL DEFAULT now()
-)

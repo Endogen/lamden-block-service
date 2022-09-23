@@ -27,8 +27,7 @@ from tgbot import TelegramBot
 # TODO: https://stackoverflow.com/questions/1237725/copying-postgresql-database-to-another-server
 # TODO: https://github.com/ultrajson/ultrajson
 
-# TODO: Set real name
-app = FastAPI(title='BlockJuggler API')
+app = FastAPI(title='LAPI')
 
 app.add_middleware(
     CORSMiddleware,
@@ -133,27 +132,27 @@ def state(contract: str = None):
     logger.debug(f'API ENTRY: state({contract})')
 
     if contract:
-        result = db.execute('state_contract_select', {'l': f'{contract}'})
+        result = db.execute(sql.select_contract(contract))
         logger.debug(f'API RESULT: {result}')
         # TODO
 
     else:
-        result = db.execute('state_select')
+        result = db.execute(sql.select_state())  # TODO
         logger.debug(f'API RESULT: {result}')
 
 
 @app.get("/contract/{contract}")
 def contract(contract: str):
-    logger.debug(f'API ENTRY: state({contract})')
+    logger.debug(f'API ENTRY: contract({contract})')
     result = db.execute('contract_select', {'c': f'{contract}'})
     logger.debug(f'API RESULT: {result}')
     return result[0][0]
 
 
 @app.get("/contracts")
-def contracts(contract: str = None, lst001: str = None, lst002: str = None):
-    logger.debug(f'API ENTRY: state({contract}, {lst001}, {lst002})')
-    result = db.execute('contracts_select')
+def contracts(contract: str = None, lst001: bool = False, lst002: bool = False, lst003: bool = False):
+    logger.debug(f'API ENTRY: contracts({contract}, {lst001}, {lst002}, {lst003})')
+    result = db.execute(sql.select_contracts(contract, lst001, lst002, lst003))
     logger.debug(f'API RESULT: {result}')
     return result
 
