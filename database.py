@@ -59,6 +59,7 @@ class DB:
             if cur: cur.close()
             if con: con.close()
 
+    # TODO: Really needed?
     def execute_raw(self, query: str):
         con = cur = None
 

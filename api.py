@@ -74,7 +74,7 @@ def db_size():
 
     try:
         logger.debug(f'API ENTRY: db_size()')
-        result = db.execute_raw(sql.select_db_size(cfg.get('db_name')))
+        result = db.execute(sql.select_db_size(), {'n': cfg.get('db_name')})
         logger.debug(f'API RESULT after {timer() - start:.4f} seconds: {result}')
 
         return result[0][1]
@@ -132,7 +132,7 @@ def state(contract: str = None):
     logger.debug(f'API ENTRY: state({contract})')
 
     if contract:
-        result = db.execute(sql.select_contract(contract))
+        result = db.execute(sql.select_contract(), {'c': contract})
         logger.debug(f'API RESULT: {result}')
         # TODO
 
@@ -144,15 +144,16 @@ def state(contract: str = None):
 @app.get("/contract/{contract}")
 def contract(contract: str):
     logger.debug(f'API ENTRY: contract({contract})')
-    result = db.execute('contract_select', {'c': f'{contract}'})
+    result = db.execute('contract_select', {'c': contract})
     logger.debug(f'API RESULT: {result}')
     return result[0][0]
 
 
+# TODO: Rework - params not integrated yet
 @app.get("/contracts")
-def contracts(contract: str = None, lst001: bool = False, lst002: bool = False, lst003: bool = False):
+def contracts(name: str = None, lst001: bool = False, lst002: bool = False, lst003: bool = False):
     logger.debug(f'API ENTRY: contracts({contract}, {lst001}, {lst002}, {lst003})')
-    result = db.execute(sql.select_contracts(contract, lst001, lst002, lst003))
+    result = db.execute(sql.select_contracts(), {'n': name})
     logger.debug(f'API RESULT: {result}')
     return result
 
