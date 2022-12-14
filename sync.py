@@ -4,14 +4,11 @@ import json
 import time
 
 import utils
-import shutil
 import requests as r
 
-from pathlib import Path
 from config import Config
 from database import DB
 from loguru import logger
-from urllib.parse import urlparse
 from timeit import default_timer as timer
 
 
@@ -39,7 +36,7 @@ class Sync:
         self.save_contract_in_db(block)
         self.save_address_in_db(block)
 
-        if self.cfg.get('save_blocks_to_file') and not self.cfg.get('sync_from_file'):
+        if self.cfg.get('save_blocks_to_file'):
             self.save_block_in_file(block)
 
         logger.debug(f'Processed block {block["number"]} in {timer() - start_time} seconds')
@@ -56,7 +53,7 @@ class Sync:
             logger.debug(f'Saved block {block_num} to file')
 
     def save_block_in_db(self, content: dict):
-        self.db.execute(sql.insert_block(), {'bn': content['number'], 'b': json.dumps(content)})
+        self.db.execute(sql.insert_block(), {'bn': content['blockNum'], 'b': json.dumps(content)})
         logger.debug(f'Saved block {content["number"]} in database')
 
     def save_transaction_in_db(self, content: dict):
@@ -154,10 +151,6 @@ class Sync:
         start = start if start else self.cfg.get('block_current')
         end = end if end else self.cfg.get('block_latest')
 
-        if start == 0:
-            if self.download_blocks(self.cfg.get('block_archive')):
-                self.cfg.set('sync_from_file', True)
-
         to_sync = list(range(start + 1, end + 1))
         missing = self.db.execute(sql.select_missing_blocks())
         missing = [x[0] for x in missing]
@@ -178,10 +171,7 @@ class Sync:
                 logger.debug(f'Block {block_num} exists - skipping...')
                 continue
 
-            if self.cfg.get('sync_from_file'):
-                state, block = self.get_block_from_file(block_num)
-            else:
-                state, block = self.get_block(block_num)
+            state, block = self.get_block(block_num)
 
             if block_num in missing and state != State.MISSING:
                 self.db.execute(sql.delete_missing_blocks(), {'bn': block_num})
@@ -198,7 +188,6 @@ class Sync:
             self.cfg.set('block_current', block_num)
 
         self.cfg.set('block_current', end)
-        if self.cfg.get('sync_from_file'): self.cfg.set('sync_from_file', False)
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_num: int) -> (State, dict):
@@ -227,20 +216,6 @@ class Sync:
         logger.error(f'Could not retrieve block {block_num}!')
         return State.INVALID, None
 
-    def get_block_from_file(self, block_num: int) -> (State, dict):
-        path = os.path.join(self.cfg.get('block_dir'), f'{block_num}.json')
-        logger.debug(f'Retrieving block from {path}')
-
-        if not Path(path).is_file():
-            logger.warning(f'Missing block {block_num}')
-            return State.MISSING, None
-
-        with open(path) as f:
-            block = json.load(f)
-
-            logger.debug(f'Block {block_num} --> {block}')
-            return self.get_block_state(block)
-
     def get_block_state(self, block: dict) -> (State, dict):
         if 'error' in block:
             logger.warning(f'Invalid block!')
@@ -249,34 +224,6 @@ class Sync:
             logger.warning(f'Invalid block!')
             return State.INVALID, block
         return State.OK, block
-
-    def download_blocks(self, url: str):
-        if not url:
-            logger.debug(f'Skipping downloading blocks - No URL')
-            return False
-
-        try:
-            start_time = timer()
-            logger.debug(f'Downloading blocks from: {url}')
-
-            filename = os.path.basename(urlparse(url).path)
-
-            with r.get(url, stream=True) as req:
-                with open(filename, 'wb') as f:
-                    shutil.copyfileobj(req.raw, f)
-
-            logger.debug(f'Downloading blocks finished in {timer() - start_time} seconds')
-
-            start_time = timer()
-            logger.debug(f'Unzipping block archive: {filename}')
-
-            shutil.unpack_archive(filename=filename, extract_dir=self.cfg.get('block_dir'))
-            logger.debug(f'Unzipping block archive finished in {timer() - start_time} seconds')
-        except Exception as e:
-            logger.exception(f'Downloading blocks failed: {e}')
-            return False
-
-        return True
 
     def con_is_lst001(self, code: str) -> bool:
         code = code.replace(' ', '')
