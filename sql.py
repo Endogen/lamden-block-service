@@ -7,6 +7,18 @@ def create_addresses():
     """
 
 
+def create_rewards():
+    return """
+    CREATE TABLE IF NOT EXISTS rewards (
+      block_num SERIAL REFERENCES blocks (block_num),
+      key text NOT NULL,
+      value jsonb NOT NULL,
+      reward jsonb NOT NULL,
+      created TIMESTAMP NOT NULL DEFAULT now()
+    )
+    """
+
+
 def create_contracts():
     return """
     CREATE TABLE IF NOT EXISTS contracts (
@@ -48,7 +60,7 @@ def create_transactions():
     CREATE TABLE IF NOT EXISTS transactions (
       hash text NOT NULL PRIMARY KEY,
       transaction JSONB NOT NULL,
-      block SERIAL REFERENCES blocks,
+      block_num SERIAL REFERENCES blocks (block_num),
       created TIMESTAMP NOT NULL DEFAULT now()
     )
     """
@@ -204,9 +216,9 @@ def insert_block():
 
 def insert_transaction():
     return """
-    INSERT INTO transactions(hash, transaction, block)
-    VALUES (%(h)s, %(t)s, %(b)s)
-    ON CONFLICT (hash) DO UPDATE SET transaction = %(t)s, block = %(b)s
+    INSERT INTO transactions(hash, transaction, block_num)
+    VALUES (%(h)s, %(t)s, %(bn)s)
+    ON CONFLICT (hash) DO UPDATE SET transaction = %(t)s, block_num = %(bn)s
     """
 
 
@@ -223,6 +235,14 @@ def insert_address():
     INSERT INTO addresses(address)
     VALUES (%(a)s)
     ON CONFLICT (address) DO NOTHING
+    """
+
+
+def insert_reward():
+    return """
+    INSERT INTO rewards(block_num, key, value, reward)
+    VALUES (%(bn)s, %(k)s, %(v)s, %(r)s)
+    ON CONFLICT (block_num) DO NOTHING
     """
 
 

@@ -30,11 +30,11 @@ class Sync:
         start_time = timer()
 
         self.save_block_in_db(block)
-        self.save_transaction_in_db(block)
-        self.save_state_change_in_db(block)
-        self.save_current_state_in_db(block)
+        self.save_tx_in_db(block)
+        self.save_state_in_db(block)
         self.save_contract_in_db(block)
         self.save_address_in_db(block)
+        self.save_reward_in_db(block)
 
         if self.cfg.get('save_blocks_to_file'):
             self.save_block_in_file(block)
@@ -54,94 +54,98 @@ class Sync:
 
     def save_block_in_db(self, content: dict):
         self.db.execute(sql.insert_block(), {'bn': content['blockNum'], 'b': json.dumps(content)})
-        logger.debug(f'Saved block {content["number"]} in database')
+        logger.debug(f'Saved block {content["number"]}')
 
-    def save_transaction_in_db(self, content: dict):
-        content_without_state = dict(content)
-        if 'state' in content_without_state:
-            del content_without_state['state']
+    def save_tx_in_db(self, content: dict):
+        tx_without_state = dict(content['processed'])
 
-        for subblock in content_without_state['subblocks']:
-            for tx in subblock['transactions']:
+        if 'state' in tx_without_state:
+            del tx_without_state['state']
+
+        tx = tx_without_state['transaction']
+
+        self.db.execute(
+            sql.insert_transaction(),
+            {'h': tx['hash'], 't': json.dumps(tx), 'bn': content['number']})
+
+        logger.debug(f'Saved tx {tx["hash"]}')
+
+    def save_state_in_db(self, content: dict):
+        tx = content['processed']
+
+        if 'state' in tx:
+            if tx['status'] == 1:
+                logger.debug(f'State not saved - tx {tx["hash"]} invalid')
+                return
+
+            self.db.execute(
+                sql.insert_state_change(),
+                {'txh': tx['hash'], 's': json.dumps(tx['state'])})
+
+            logger.debug(f'Saved state {tx["state"]}')
+
+            for kv in tx['state']:
                 self.db.execute(
-                    sql.insert_transaction(),
-                    {'h': tx['hash'], 't': json.dumps(tx), 'b': content['number']})
+                    sql.insert_current_state(),
+                    {'txh': tx['hash'], 'k': kv['key'], 'v': json.dumps(kv['value'])})
 
-                logger.debug(f'Saved transaction {tx["hash"]} in database')
-
-    def save_state_change_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                if tx['status'] == 1:
-                    continue
-                if 'state' in tx:
-                    self.db.execute(
-                        sql.insert_state_change(),
-                        {'txh': tx['hash'], 's': json.dumps(tx['state'])})
-
-                    logger.debug(f'Saved state change from {tx["hash"]} in database')
-                else:
-                    logger.debug(f'State change: No state in tx {tx["hash"]}')
-
-    def save_current_state_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                if tx['status'] == 1:
-                    continue
-                if 'state' in tx:
-                    for kv in tx['state']:
-                        self.db.execute(
-                            sql.insert_current_state(),
-                            {'txh': tx['hash'], 'k': kv['key'], 'v': json.dumps(kv['value'])})
-
-                    logger.debug(f'Saved current state from {tx["hash"]} in database')
-                else:
-                    logger.debug(f'Current state: No state in tx {tx["hash"]}')
+                logger.debug(f'Saved single state {kv["key"]}')
+        else:
+            logger.debug(f'No state in tx {tx["hash"]}')
 
     def save_contract_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                if tx['status'] == 1:
-                    continue
+        tx = content['processed']
 
-                pld = tx['transaction']['payload']
-                con = pld['contract']
-                fun = pld['function']
+        if tx['status'] == 1:
+            return
 
-                if con == 'submission' and fun == 'submit_contract':
-                    kwargs = pld['kwargs']
-                    code = kwargs['code']
-                    name = kwargs['name']
+        pld = tx['transaction']['payload']
+        con = pld['contract']
+        fun = pld['function']
 
-                    lst1 = self.con_is_lst001(code)
-                    lst2 = self.con_is_lst002(code)
-                    lst3 = self.con_is_lst003(code)
+        if con == 'submission' and fun == 'submit_contract':
+            kwargs = pld['kwargs']
+            code = kwargs['code']
+            name = kwargs['name']
 
-                    self.db.execute(
-                        sql.insert_contract(),
-                        {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2, 'l3': lst3})
+            lst1 = self.con_is_lst001(code)
+            lst2 = self.con_is_lst002(code)
+            lst3 = self.con_is_lst003(code)
 
-                    logger.debug(f'Saved contract {name} in database')
+            self.db.execute(
+                sql.insert_contract(),
+                {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2, 'l3': lst3})
+
+            logger.debug(f'Saved contract {name}')
 
     def save_address_in_db(self, content: dict):
-        for subblock in content['subblocks']:
-            for tx in subblock['transactions']:
-                if tx['status'] == 1:
-                    continue
+        tx = content['processed']
 
-                pld = tx['transaction']['payload']
-                sender = pld['sender']
+        pld = tx['transaction']['payload']
+        sender = pld['sender']
 
-                if utils.is_valid_address(sender):
-                    self.db.execute(sql.insert_address(), {'a': sender})
-                    logger.debug(f'Saving address in database: {sender}')
+        if utils.is_valid_address(sender):
+            self.db.execute(sql.insert_address(), {'a': sender})
 
-                if 'kwargs' in pld:
-                    if 'to' in pld['kwargs']:
-                        to = pld['kwargs']['to']
-                        if utils.is_valid_address(to):
-                            self.db.execute(sql.insert_address(), {'a': to})
-                            logger.debug(f'Saving address in database: {to}')
+            logger.debug(f'Saved address {sender}')
+
+        if 'kwargs' in pld:
+            if 'to' in pld['kwargs']:
+                to = pld['kwargs']['to']
+                if utils.is_valid_address(to):
+                    self.db.execute(sql.insert_address(), {'a': to})
+
+                    logger.debug(f'Saved address {to}')
+
+    def save_reward_in_db(self, content: dict):
+        rewards = content['rewards']
+
+        for rw in rewards:
+            self.db.execute(
+                sql.insert_reward(),
+                {'bn': content['number'], 'k': rw['key'], 'v': json.dumps(rw['value']), 'r': json.dumps(rw['reward'])})
+
+            logger.debug(f'Saved reward {rw}')
 
     def sync(self, start: int = None, end: int = None):
         start_time = timer()

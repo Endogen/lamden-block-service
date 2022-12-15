@@ -50,11 +50,13 @@ class LamdenSync:
             self.db.execute(sql.create_current_state())
             self.db.execute(sql.create_contracts())
             self.db.execute(sql.create_addresses())
+            self.db.execute(sql.create_rewards())
         except Exception as e:
             logger.exception(e)
             raise SystemExit
 
     def __init_sync(self):
+        # TODO: Switch to UTC
         self.scheduler = BackgroundScheduler(timezone="Europe/Berlin")
 
         self.scheduler.add_job(
