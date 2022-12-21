@@ -76,18 +76,4 @@ def sync_missing_blocks():
             sync.process(block)
 
 
-@app.command()
-def sync_invalid_blocks():
-    missing = sync.db.execute(sql.select_invalid_blocks())
-    missing = [x[0] for x in missing]
-    missing = list(set(missing))
-    missing.sort(key=int)
-
-    for block_num in missing:
-        state, block = sync.get_block(block_num)
-
-        if state == State.OK:
-            sync.process(block)
-
-
 app()

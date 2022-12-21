@@ -75,15 +75,6 @@ def create_missing_blocks():
     """
 
 
-def create_invalid_blocks():
-    return """
-    CREATE TABLE IF NOT EXISTS blocks_invalid (
-      block_num SERIAL NOT NULL PRIMARY KEY,
-      created TIMESTAMP NOT NULL DEFAULT now()
-    )
-    """
-
-
 def create_blocks():
     return """
     CREATE TABLE IF NOT EXISTS blocks (
@@ -140,10 +131,6 @@ def select_missing_blocks():
     SELECT block_num
     FROM blocks_missing
     """
-
-
-def select_invalid_blocks():
-    return "SELECT block_num FROM blocks_invalid"
 
 
 def select_contract():

@@ -43,7 +43,6 @@ class LamdenSync:
     def __init_db(self):
         try:
             self.db.execute(sql.create_blocks())
-            self.db.execute(sql.create_invalid_blocks())
             self.db.execute(sql.create_missing_blocks())
             self.db.execute(sql.create_transactions())
             self.db.execute(sql.create_state_change())

@@ -1,7 +1,7 @@
 {
-    "block_current": 1048198,
+    "block_current": 0,
+    "block_synced": 0,
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-v2",
-    "block_latest": 1048483,
     "job_interval_sync": 10,
     "log_level": "INFO",
     "log_retention": 3,
