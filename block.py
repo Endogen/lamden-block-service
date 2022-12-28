@@ -36,17 +36,20 @@ class Block:
 
         # Only continue if it is not the first block
         if self._has_prev:
-            # Transaction without state
+            # Save transaction
             self._tx = content['processed']
-            if 'state' in self._tx: del self._tx['state']
+            # Check for state in transaction
+            if 'state' in content['processed']:
+                # If present, save as state
+                self._state = content['processed']['state']
+                # Remove state from transaction itself
+                del self._tx['state']
             # Transaction was valid or not
             status = content['processed']['status']
             self._is_valid = True if status == 0 else False
             # If transaction is not valid then 'result' has the error msg
             result = content['processed']['result']
             self._result = None if result == "None" else result
-            # State changes
-            self._state = content['processed']['state']
             # Distributed rewards
             self._rewards = content['rewards']
             # Set empty address list for now
