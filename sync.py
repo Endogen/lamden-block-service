@@ -3,15 +3,16 @@ import sql
 import json
 import time
 
-import utils
 import requests as r
 
+from block import Block
 from config import Config
 from database import DB
 from loguru import logger
 from timeit import default_timer as timer
 
 
+# TODO: Remove INVALID
 class State:
     MISSING = 1
     INVALID = 2
@@ -26,138 +27,127 @@ class Sync:
         self.cfg = config
         self.db = database
 
-    def process(self, block: dict):
+    def process(self, block: Block):
         start_time = timer()
 
-        self.save_block_in_db(block)
-        self.save_tx_in_db(block)
-        self.save_state_in_db(block)
-        self.save_contract_in_db(block)
-        self.save_address_in_db(block)
-        self.save_reward_in_db(block)
+        # SAVE BLOCK
+
+        self.db.execute(
+            sql.insert_block(),
+            {'bn': block.block_num, 'b': json.dumps(block.content)})
+
+        logger.debug(f'Saved block {block.block_num} - {timer() - start_time} seconds')
+
+        # SAVE TRANSACTION
+
+        self.db.execute(
+            sql.insert_transaction(),
+            {'h': block.tx['hash'], 't': json.dumps(block.tx), 'bn': block.block_num})
+
+        logger.debug(f'Saved tx {block.tx["hash"]} - {timer() - start_time} seconds')
+
+        # SAVE STATE
+        # TODO: Logik auslagern in Block class?
+        if block.state:
+            if block.is_valid:
+                self.db.execute(
+                    sql.insert_state_change(),
+                    {'txh': block.tx["hash"], 's': json.dumps(block.state)})
+
+                logger.debug(f'Saved state {block.state} - {timer() - start_time} seconds')
+
+                for kv in block.state:
+                    self.db.execute(
+                        sql.insert_current_state(),
+                        {'txh': block.tx["hash"], 'k': kv['key'], 'v': json.dumps(kv['value'])})
+
+                    logger.debug(f'Saved single state {kv["key"]} - {timer() - start_time} seconds')
+            else:
+                logger.debug(f'State not saved - tx {block.tx["hash"]} invalid')
+        else:
+            logger.debug(f'No state in tx {block.tx["hash"]}')
+
+        # SAVE CONTRACT
+
+        if block.is_contract:
+            self.db.execute(
+                sql.insert_contract(),
+                {'txh': block.tx["hash"], 'n': block.contract, 'c': block.code,
+                 'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003})
+
+            logger.debug(f'Saved contract {block.contract} '
+                         f'(LST001={block.is_lst001}, LST002={block.is_lst002}, LST003={block.is_lst003}) '
+                         f'- {timer() - start_time} seconds')
+
+        # SAVE ADDRESSES
+        for address in block.addresses:
+            self.db.execute(
+                sql.insert_address(),
+                {'a': address})
+
+            logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
+
+        # SAVE REWARDS
+
+        for rw in block.rewards:
+            self.db.execute(
+                sql.insert_reward(),
+                {'bn': block.block_num, 'k': rw['key'], 'v': json.dumps(rw['value']), 'r': json.dumps(rw['reward'])})
+
+            logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
+
+        # SAVE BLOCK TO FILE
 
         if self.cfg.get('save_blocks_to_file'):
             self.save_block_in_file(block)
 
-        logger.debug(f'Processed block {block["number"]} in {timer() - start_time} seconds')
+            logger.debug(f'Saved block {block.block_num} to file - {timer() - start_time} seconds')
 
-    def save_block_in_file(self, content: dict):
+        logger.debug(f'Processed block {block.block_num} in {timer() - start_time} seconds')
+
+    def save_block_in_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')
-        block_num = content['number']
-
-        file = os.path.join(block_dir, f'{block_num}.json')
+        file = os.path.join(block_dir, f'{block.block_num}.json')
         os.makedirs(os.path.dirname(file), exist_ok=True)
 
         with open(file, 'w', encoding='utf-8') as f:
-            json.dump(content, f, sort_keys=True, indent=4)
-            logger.debug(f'Saved block {block_num} to file')
+            json.dump(block.content, f, sort_keys=True, indent=4)
+            logger.debug(f'Saved block {block.block_num} to file')
 
-    def save_block_in_db(self, content: dict):
-        self.db.execute(sql.insert_block(), {'bn': content['blockNum'], 'b': json.dumps(content)})
-        logger.debug(f'Saved block {content["number"]}')
-
-    def save_tx_in_db(self, content: dict):
-        tx_without_state = dict(content['processed'])
-
-        if 'state' in tx_without_state:
-            del tx_without_state['state']
-
-        tx = tx_without_state['transaction']
-
-        self.db.execute(
-            sql.insert_transaction(),
-            {'h': tx['hash'], 't': json.dumps(tx), 'bn': content['number']})
-
-        logger.debug(f'Saved tx {tx["hash"]}')
-
-    def save_state_in_db(self, content: dict):
-        tx = content['processed']
-
-        if 'state' in tx:
-            if tx['status'] == 1:
-                logger.debug(f'State not saved - tx {tx["hash"]} invalid')
-                return
-
-            self.db.execute(
-                sql.insert_state_change(),
-                {'txh': tx['hash'], 's': json.dumps(tx['state'])})
-
-            logger.debug(f'Saved state {tx["state"]}')
-
-            for kv in tx['state']:
-                self.db.execute(
-                    sql.insert_current_state(),
-                    {'txh': tx['hash'], 'k': kv['key'], 'v': json.dumps(kv['value'])})
-
-                logger.debug(f'Saved single state {kv["key"]}')
-        else:
-            logger.debug(f'No state in tx {tx["hash"]}')
-
-    def save_contract_in_db(self, content: dict):
-        tx = content['processed']
-
-        if tx['status'] == 1:
-            return
-
-        pld = tx['transaction']['payload']
-        con = pld['contract']
-        fun = pld['function']
-
-        if con == 'submission' and fun == 'submit_contract':
-            kwargs = pld['kwargs']
-            code = kwargs['code']
-            name = kwargs['name']
-
-            lst1 = self.con_is_lst001(code)
-            lst2 = self.con_is_lst002(code)
-            lst3 = self.con_is_lst003(code)
-
-            self.db.execute(
-                sql.insert_contract(),
-                {'txh': tx['hash'], 'n': name, 'c': code, 'l1': lst1, 'l2': lst2, 'l3': lst3})
-
-            logger.debug(f'Saved contract {name}')
-
-    def save_address_in_db(self, content: dict):
-        tx = content['processed']
-
-        pld = tx['transaction']['payload']
-        sender = pld['sender']
-
-        if utils.is_valid_address(sender):
-            self.db.execute(sql.insert_address(), {'a': sender})
-
-            logger.debug(f'Saved address {sender}')
-
-        if 'kwargs' in pld:
-            if 'to' in pld['kwargs']:
-                to = pld['kwargs']['to']
-                if utils.is_valid_address(to):
-                    self.db.execute(sql.insert_address(), {'a': to})
-
-                    logger.debug(f'Saved address {to}')
-
-    def save_reward_in_db(self, content: dict):
-        rewards = content['rewards']
-
-        for rw in rewards:
-            self.db.execute(
-                sql.insert_reward(),
-                {'bn': content['number'], 'k': rw['key'], 'v': json.dumps(rw['value']), 'r': json.dumps(rw['reward'])})
-
-            logger.debug(f'Saved reward {rw}')
-
-    def sync(self, start: int = None, end: int = None):
+    # TODO: Maybe i have to remove MISSING BLOCKS...
+    # TODO: If block has_prev is False, load state from genesis_block.json
+    def sync(self, start: int = None, end: int = None, include_missing: bool = True, check_existing: bool = True):
         start_time = timer()
 
         logger.debug(f'Sync job --> Started...')
 
-        start = start if start else self.cfg.get('block_current')
-        end = end if end else self.cfg.get('block_latest')
+        current_block = 0
+        start_block = start if start else self.cfg.get('block_current')
+        end_block = end if end else self.cfg.get('block_synced')
+
+        # TODO: Create block here and replave TRUE check with block.has_prev
+        sync = True
+
+        while sync:
+            # 1) check if check_existing is true. if yes, check if exists. if yes, extract next block
+            # 2) get block, return if it has a previous block
+            # 3) set current_block to last checked block?
+            # 4) check if previous block is end_block
+            # 5)
+            # check if we are done yet. If yes, set 'sync' to False
+            # add timer to check how long we are syncing. If too long, end and wait for next sync
+
+        # If block_synced == 0, then we need to find the first block nr somehow
+
+        # TODO: After regular sync is over, process genesis block if not done yet
+
+        if include_missing:
+            missing = self.db.execute(sql.select_missing_blocks())
+            missing = [x[0] for x in missing]
+
 
         to_sync = list(range(start + 1, end + 1))
-        missing = self.db.execute(sql.select_missing_blocks())
-        missing = [x[0] for x in missing]
+
 
         to_sync.extend(missing)
         to_sync = list(set(to_sync))
@@ -228,52 +218,3 @@ class Sync:
             logger.warning(f'Invalid block!')
             return State.INVALID, block
         return State.OK, block
-
-    def con_is_lst001(self, code: str) -> bool:
-        code = code.replace(' ', '')
-
-        if 'balances=Hash(' not in code:
-            return False
-        if '@export\ndeftransfer(amount:float,to:str):' not in code:
-            return False
-        if '@export\ndefapprove(amount:float,to:str):' not in code:
-            return False
-        if '@export\ndeftransfer_from(amount:float,to:str,main_account:str):' not in code:
-            return False
-
-        logger.debug('Contract is LST001 compatible')
-        return True
-
-    def con_is_lst002(self, code: str) -> bool:
-        code = code.replace(' ', '')
-
-        if 'metadata=Hash(' not in code:
-            return False
-
-        logger.debug('Contract is LST002 compatible')
-        return True
-
-    def con_is_lst003(self, code: str) -> bool:
-        code = code.replace(' ', '')
-
-        if 'collection_name=Variable()' not in code:
-            return False
-        if 'collection_owner=Variable()' not in code:
-            return False
-        if 'collection_nfts=Hash(' not in code:
-            return False
-        if 'collection_balances=Hash(' not in code:
-            return False
-        if 'collection_balances_approvals=Hash(' not in code:
-            return False
-        if '@export\ndefmint_nft(name:str,description:str,ipfs_image_url:str,metadata:dict,amount:int):' not in code:
-            return False
-        if '@export\ndeftransfer(name:str,amount:int,to:str):' not in code:
-            return False
-        if '@export\ndefapprove(amount:int,name:str,to:str):' not in code:
-            return False
-        if '@export\ndeftransfer_from(name:str,amount:int,to:str,main_account:str):' not in code:
-            return False
-
-        logger.debug('Contract is LST003 compatible')
-        return True

@@ -7,6 +7,7 @@ import json
 import websocket
 import utils
 
+from block import Block
 from tgbot import TelegramBot
 from sync import Sync
 from database import DB
@@ -60,7 +61,7 @@ class LamdenSync:
 
         self.scheduler.add_job(
             self.sync.sync,
-            name="sync_state",
+            name="sync_blocks",
             trigger='interval',
             seconds=self.cfg.get('job_interval_sync'),
             next_run_time=datetime.now() + timedelta(seconds=5),
@@ -98,13 +99,15 @@ class LamdenSync:
     def on_message(self, ws, msg):
         logger.info(f'New event --> {msg}')
 
-        json_msg = json.loads(msg)
-        event, block = json_msg['event'], json_msg['data']
+        raw = json.loads(msg)
+        event, data = raw['event'], raw['data']
+
+        block = Block(data)
 
         if event == 'latest_block':
-            self.cfg.set('block_latest', block['number'])
+            self.cfg.set('block_latest', block.block_num)
         elif event == 'new_block':
-            self.cfg.set('block_latest', block['number'])
+            self.cfg.set('block_latest', block.block_num)
             Thread(target=self.sync.process, args=[block]).start()
 
     def on_ping(self, ws, msg):
