@@ -47,7 +47,7 @@ class Sync:
         logger.debug(f'Saved tx {block.tx["hash"]} - {timer() - start_time} seconds')
 
         # SAVE STATE
-        # TODO: Logik auslagern in Block class?
+
         if block.state:
             if block.is_valid:
                 self.db.execute(
