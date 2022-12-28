@@ -10,11 +10,12 @@ def create_addresses():
 def create_rewards():
     return """
     CREATE TABLE IF NOT EXISTS rewards (
-      block_num SERIAL REFERENCES blocks (block_num),
+      block_num BIGINT REFERENCES blocks (block_num),
       key text NOT NULL,
       value jsonb NOT NULL,
       reward jsonb NOT NULL,
-      created TIMESTAMP NOT NULL DEFAULT now()
+      created TIMESTAMP NOT NULL DEFAULT now(),
+      PRIMARY KEY (block_num, key)
     )
     """
 
@@ -60,7 +61,7 @@ def create_transactions():
     CREATE TABLE IF NOT EXISTS transactions (
       hash text NOT NULL PRIMARY KEY,
       transaction JSONB NOT NULL,
-      block_num SERIAL REFERENCES blocks (block_num),
+      block_num BIGINT REFERENCES blocks (block_num),
       created TIMESTAMP NOT NULL DEFAULT now()
     )
     """
@@ -69,7 +70,7 @@ def create_transactions():
 def create_missing_blocks():
     return """
     CREATE TABLE IF NOT EXISTS blocks_missing (
-      block_num SERIAL NOT NULL PRIMARY KEY,
+      block_num BIGINT NOT NULL PRIMARY KEY,
       created TIMESTAMP NOT NULL DEFAULT now()
     )
     """
@@ -78,7 +79,7 @@ def create_missing_blocks():
 def create_blocks():
     return """
     CREATE TABLE IF NOT EXISTS blocks (
-      block_num SERIAL NOT NULL PRIMARY KEY,
+      block_num BIGINT NOT NULL PRIMARY KEY,
       block JSONB NOT NULL,
       created TIMESTAMP NOT NULL DEFAULT now()
     )
@@ -229,7 +230,7 @@ def insert_reward():
     return """
     INSERT INTO rewards(block_num, key, value, reward)
     VALUES (%(bn)s, %(k)s, %(v)s, %(r)s)
-    ON CONFLICT (block_num) DO NOTHING
+    ON CONFLICT (block_num, key) DO UPDATE SET block_num = %(bn)s, key = %(k)s, value = %(v)s, reward = %(r)s
     """
 
 
