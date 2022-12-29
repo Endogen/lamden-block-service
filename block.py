@@ -1,115 +1,120 @@
-from loguru import logger
-from timeit import default_timer as timer
+class WrongBlockDataException(Exception):
+    pass
+
+
+class InvalidBlockException(Exception):
+    pass
 
 
 class Block:
 
-    _content = None
-    _prev = None
-    _has_prev = None
-    _block_num = None
-    _tx = None
-    _is_valid = None
-    _result = None
-    _state = None
-    _rewards = None
-    _is_contract = None
-    _contract = None
-    _code = None
-    _is_lst001 = None
-    _is_lst002 = None
-    _is_lst003 = None
-    _addresses = None
+    _content = dict()
+    _hash = str()
+    _timestamp = str()
+    _prev = str()
+    _block_num = -1
+    _tx = dict()
+    _is_valid = False
+    _result = str()
+    _state = dict()
+    _rewards = dict()
+    _is_contract = False
+    _contract = str()
+    _code = str()
+    _is_lst001 = False
+    _is_lst002 = False
+    _is_lst003 = False
+    _addresses = list()
 
     def __init__(self, content: dict):
-        start_time = timer()
+        if 'error' in content:
+            raise InvalidBlockException(content['error'])
 
-        # Whole block content
-        self._content = content
-        # Block number
-        self._block_num = int(content['number'])
-        # Previous block hash
-        self._prev = content['previous']
-        # If block hash has only zeros, it's the first block
-        first = all(c in '0' for c in content['previous'])
-        self._has_prev = False if first else True
+        try:
+            # Whole block content
+            self._content = content
 
-        # Only continue if it is not the first block
-        if self._has_prev:
+            # Block hash
+            self._hash = content['hash']
+
+            # HLC timestamp
+            self._timestamp = content['hlc_timestamp']
+
+            # Block number
+            self._block_num = int(content['number'])
+
+            # Previous block hash
+            self._prev = content['previous']
+
             # Save transaction
             self._tx = content['processed']
+
             # Check for state in transaction
             if 'state' in content['processed']:
                 # If present, save as state
                 self._state = content['processed']['state']
+
                 # Remove state from transaction itself
                 del self._tx['state']
+
             # Transaction was valid or not
             status = content['processed']['status']
             self._is_valid = True if status == 0 else False
+
             # If transaction is not valid then 'result' has the error msg
             result = content['processed']['result']
             self._result = None if result == "None" else result
+
             # Distributed rewards
             self._rewards = content['rewards']
-            # Set empty address list for now
-            self._addresses = list()
 
-            def no_contract():
-                self._is_contract = False
-                self._contract = None
-                self._code = None
+            # Transaction payload
+            pld = content['processed']['transaction']['payload']
+            con = pld['contract']
+            fun = pld['function']
 
-                self._is_lst001 = False
-                self._is_lst002 = False
-                self._is_lst003 = False
+            # Check FROM address
+            if self._is_valid_address(pld['sender']):
+                self._addresses.append(pld['sender'])
+            # Check TO address
+            if 'to' in pld['kwargs']:
+                if self._is_valid_address(pld['kwargs']['to']):
+                    self._addresses.append(pld['kwargs']['to'])
 
-            if self._is_valid:
-                pld = content['processed']['transaction']['payload']
-                con = pld['contract']
-                fun = pld['function']
+            # Check if new contract was submitted
+            if con == 'submission' and fun == 'submit_contract':
+                kwargs = pld['kwargs']
 
-                # Check FROM address
-                if self._is_valid_address(pld['sender']):
-                    self._addresses.append(pld['sender'])
-                # Check TO address
-                if 'to' in pld['kwargs']:
-                    if self._is_valid_address(pld['kwargs']['to']):
-                        self._addresses.append(pld['kwargs']['to'])
+                self._is_contract = True
+                self._contract = kwargs['name']
+                self._code = kwargs['code']
 
-                # Check if new contract was submitted
-                if con == 'submission' and fun == 'submit_contract':
-                    kwargs = pld['kwargs']
+                self._is_lst001 = self._con_is_lst001(kwargs['code'])
+                self._is_lst002 = self._con_is_lst002(kwargs['code'])
+                self._is_lst003 = self._con_is_lst003(kwargs['code'])
 
-                    self._is_contract = True
-                    self._contract = kwargs['name']
-                    self._code = kwargs['code']
-
-                    self._is_lst001 = self._con_is_lst001(kwargs['code'])
-                    self._is_lst002 = self._con_is_lst002(kwargs['code'])
-                    self._is_lst003 = self._con_is_lst003(kwargs['code'])
-                else:
-                    no_contract()
-            else:
-                no_contract()
-
-        logger.debug(f'Loaded block {content["number"]} in {timer() - start_time} seconds')
+        except Exception as e:
+            raise WrongBlockDataException(repr(e))
 
     @property
-    def content(self):
+    def content(self) -> dict:
         return self._content
 
     @property
-    def prev(self):
-        return self._prev
-
-    @property
-    def has_prev(self) -> bool:
-        return self._has_prev
+    def hash(self) -> str:
+        return self._hash
 
     @property
     def block_num(self) -> int:
         return self._block_num
+
+    @property
+    def timestamp(self) -> str:
+        return self._timestamp
+
+    @property
+    def prev(self) -> str:
+        return self._prev
 
     @property
     def tx(self) -> dict:
@@ -120,43 +125,43 @@ class Block:
         return self._is_valid
 
     @property
-    def result(self):
+    def result(self) -> str:
         return self._result
 
     @property
-    def state(self):
+    def state(self) -> dict:
         return self._state
 
     @property
-    def rewards(self):
+    def rewards(self) -> dict:
         return self._rewards
 
     @property
-    def is_contract(self):
+    def is_contract(self) -> bool:
         return self._is_contract
 
     @property
-    def contract(self):
+    def contract(self) -> str:
         return self._contract
 
     @property
-    def code(self):
+    def code(self) -> str:
         return self._code
 
     @property
-    def is_lst001(self):
+    def is_lst001(self) -> bool:
         return self._is_lst001
 
     @property
-    def is_lst002(self):
+    def is_lst002(self) -> bool:
         return self.is_lst002
 
     @property
-    def is_lst003(self):
+    def is_lst003(self) -> bool:
         return self.is_lst003
 
     @property
-    def addresses(self):
+    def addresses(self) -> list:
         return self._addresses
 
     def _con_is_lst001(self, code: str) -> bool:
