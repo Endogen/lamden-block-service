@@ -5,18 +5,11 @@ import time
 
 import requests as r
 
-from block import Block
 from config import Config
 from database import DB
 from loguru import logger
 from timeit import default_timer as timer
-
-
-# TODO: Remove INVALID
-class State:
-    MISSING = 1
-    INVALID = 2
-    OK = 3
+from block import Block, WrongBlockDataException, InvalidBlockException
 
 
 class Sync:
@@ -26,6 +19,10 @@ class Sync:
     def __init__(self, config: Config, database: DB):
         self.cfg = config
         self.db = database
+
+        # Save block hash of genesis block
+        if not self.cfg.get('genesis_block_hash'):
+            self.cfg.set('genesis_block_hash', self.get_block(0).hash)
 
     def process(self, block: Block):
         start_time = timer()
@@ -114,77 +111,58 @@ class Sync:
             json.dump(block.content, f, sort_keys=True, indent=4)
             logger.debug(f'Saved block {block.block_num} to file')
 
-    # TODO: Maybe i have to remove MISSING BLOCKS...
-    # TODO: If block has_prev is False, load state from genesis_block.json
-    def sync(self, start: int = None, end: int = None, include_missing: bool = True, check_existing: bool = True):
+    # TODO: How to make sure that sync from CLI won't set values in config?
+    def sync(self, start: int = None, end: int = None, process_existing: bool = False):
         start_time = timer()
 
         logger.debug(f'Sync job --> Started...')
 
-        current_block = 0
-        start_block = start if start else self.cfg.get('block_current')
-        end_block = end if end else self.cfg.get('block_synced')
+        # Block number to start syncing from
+        sync_start = start if start else self.cfg.get('sync_start')
+        if not sync_start: sync_start = self.cfg.get('block_latest')
 
-        # TODO: Create block here and replave TRUE check with block.has_prev
-        sync = True
+        # Block number to stop syncing at
+        sync_end = end if end else self.cfg.get('sync_end')
+        if not sync_end: sync_end = 0
 
-        while sync:
-            # 1) check if check_existing is true. if yes, check if exists. if yes, extract next block
-            # 2) get block, return if it has a previous block
-            # 3) set current_block to last checked block?
-            # 4) check if previous block is end_block
-            # 5)
-            # check if we are done yet. If yes, set 'sync' to False
-            # add timer to check how long we are syncing. If too long, end and wait for next sync
-
-        # If block_synced == 0, then we need to find the first block nr somehow
-
-        # TODO: After regular sync is over, process genesis block if not done yet
-
-        if include_missing:
-            missing = self.db.execute(sql.select_missing_blocks())
-            missing = [x[0] for x in missing]
-
-
-        to_sync = list(range(start + 1, end + 1))
-
-
-        to_sync.extend(missing)
-        to_sync = list(set(to_sync))
-        to_sync.sort(key=int)
-
-        if not to_sync:
-            logger.debug(f'Sync job --> Synchronized!')
+        # End sync if both, start and end, are the same
+        if sync_start == sync_end:
+            logger.debug(f'Sync job --> Synchronized')
             return
 
-        logger.debug(f'Missing: {missing}')
-        logger.debug(f'To Sync: {to_sync}')
+        block = self.get_block(sync_start)
 
-        for block_num in to_sync:
-            if self.db.execute(sql.block_exists(), {'bn': block_num})[0][0]:
-                logger.debug(f'Block {block_num} exists - skipping...')
-                continue
-
-            state, block = self.get_block(block_num)
-
-            if block_num in missing and state != State.MISSING:
-                self.db.execute(sql.delete_missing_blocks(), {'bn': block_num})
-
-            if state == State.OK:
+        while block:
+            # Check if block already exists in database
+            if self.db.execute(sql.block_exists(), {'bn': block.block_num})[0][0]:
+                if process_existing:
+                    self.process(block)
+                    logger.debug(f'Block {block.block_num} exists - processing...')
+                else:
+                    # TODO: Read block from DB and set 'sync_start = block.block_num'
+                    logger.debug(f'Block {block.block_num} exists - skipping...')
+            else:
                 self.process(block)
-            elif state == State.MISSING:
-                self.db.execute(sql.insert_missing_blocks(), {'bn': block_num})
-                logger.warning(f'Block {block_num} missing...')
-            elif state == State.INVALID:
-                self.db.execute(sql.insert_invalid_blocks(), {'bn': block_num})
-                logger.warning(f'Block {block_num} invalid...')
 
-            self.cfg.set('block_current', block_num)
+            # End sync if current block number is same as sync end
+            if block.block_num == sync_end:
+                self.cfg.set('sync_end', sync_start)
+                break
 
-        self.cfg.set('block_current', end)
+            # If previous block is genesis block, process it separately
+            # Genesis block is special and differs from normal blocks
+            if block.prev == self.cfg.get('genesis_block_hash'):
+                # TODO: Process genesis block
+                break
+
+            block = self.get_block(block.prev)
+            self.cfg.set('sync_start', block.block_num)
+
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
-    def get_block(self, block_num: int) -> (State, dict):
+    def get_block(self, block: (int, str)) -> Block:
+        """ 'block' param can either be block hash or block number """
+
         for source in self.cfg.get('retrieve_state_from'):
             host = source['host']
             wait = source['wait']
@@ -193,28 +171,17 @@ class Sync:
                 logger.debug(f'Waiting for {wait} seconds...')
                 time.sleep(wait)
 
-            host = host.replace('{block_num}', str(block_num))
+            host = host.replace('{block}', str(block))
             logger.debug(f'Retrieving block from {host}')
 
             try:
                 with r.get(host) as data:
-                    logger.info(f'Block {block_num} --> {data.text}')
-                    state, block = self.get_block_state(data.json())
+                    logger.info(f'Block {block} --> {data.text}')
+                    return Block(data.json())
 
-                    if state == State.OK:
-                        return state, block
-
+            except InvalidBlockException as e:
+                logger.exception(f'Block {block} - invalid: {e}')
+            except WrongBlockDataException as e:
+                logger.exception(f'Block {block} - wrong data: {e}')
             except Exception as e:
-                logger.exception(f'get_block({block_num}) --> {e}')
-
-        logger.error(f'Could not retrieve block {block_num}!')
-        return State.INVALID, None
-
-    def get_block_state(self, block: dict) -> (State, dict):
-        if 'error' in block:
-            logger.warning(f'Invalid block!')
-            return State.INVALID, block
-        if block['hash'] == 'block-does-not-exist':
-            logger.warning(f'Invalid block!')
-            return State.INVALID, block
-        return State.OK, block
+                logger.exception(f'Block {block} - can not retrieve: {e}')
