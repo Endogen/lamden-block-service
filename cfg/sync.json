@@ -1,37 +1,40 @@
 {
     "block_current": 0,
-    "block_synced": 0,
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-v2",
+    "genesis_block_hash": null,
+    "block_latest": 1672196980345881600,
     "job_interval_sync": 10,
-    "log_level": "INFO",
+    "log_level": "DEBUG",
     "log_retention": 3,
     "retrieve_state_from": [
         {
-            "host": "https://testnet-v2-bs-lon.lamden.io/blocks/{block_num}",
+            "host": "https://testnet-v2-bs-lon.lamden.io/blocks/{block}",
             "wait": 0
         },
         {
-            "host": "https://testnet-v2-bs-sf.lamden.io/blocks/{block_num}",
+            "host": "https://testnet-v2-bs-sf.lamden.io/blocks/{block}",
             "wait": 0
         },
         {
-            "host": "https://testnet-v2-bs-bang.lamden.io/blocks/{block_num}",
+            "host": "https://testnet-v2-bs-bang.lamden.io/blocks/{block}",
             "wait": 0
         },
         {
-            "host": "https://testnet-v2-master-lon.lamden.io/blocks?num={block_num}",
+            "host": "https://testnet-v2-master-lon.lamden.io/blocks?num={block}",
             "wait": 1
         },
         {
-            "host": "https://testnet-v2-master-sf.lamden.io/blocks?num={block_num}",
+            "host": "https://testnet-v2-master-sf.lamden.io/blocks?num={block}",
             "wait": 1
         },
         {
-            "host": "https://testnet-v2-master-bang.lamden.io/blocks?num={block_num}",
+            "host": "https://testnet-v2-master-bang.lamden.io/blocks?num={block}",
             "wait": 1
         }
     ],
     "save_blocks_to_file": true,
+    "sync_end": null,
+    "sync_start": null,
     "telegram_notify": 134166731,
     "ws_masternode": "wss://testnet-v2-master-lon.lamden.io",
     "ws_ping_interval": 10,
