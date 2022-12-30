@@ -67,19 +67,11 @@ def create_transactions():
     """
 
 
-def create_missing_blocks():
-    return """
-    CREATE TABLE IF NOT EXISTS blocks_missing (
-      block_num BIGINT NOT NULL PRIMARY KEY,
-      created TIMESTAMP NOT NULL DEFAULT now()
-    )
-    """
-
-
 def create_blocks():
     return """
     CREATE TABLE IF NOT EXISTS blocks (
       block_num BIGINT NOT NULL PRIMARY KEY,
+      block_hash text NOT NULL,
       block JSONB NOT NULL,
       created TIMESTAMP NOT NULL DEFAULT now()
     )
@@ -127,11 +119,20 @@ def select_balances(address: str):
            f"ORDER BY key"
 
 
+# TODO: Remove all the missing blocks logic?
 def select_missing_blocks():
     return """
     SELECT block_num
     FROM blocks_missing
     """
+
+
+def select_block_by_num():
+    return f"SELECT * FROM blocks WHERE block_num = %(bn)s"
+
+
+def select_block_by_hash():
+    return f"SELECT * FROM blocks WHERE block_hash = %(bh)s"
 
 
 def select_contract():
@@ -196,9 +197,9 @@ def insert_missing_blocks():
 
 def insert_block():
     return """
-    INSERT INTO blocks(block_num, block)
-    VALUES (%(bn)s, %(b)s)
-    ON CONFLICT (block_num) DO UPDATE SET block = %(b)s
+    INSERT INTO blocks(block_num, block_hash, block)
+    VALUES (%(bn)s, %(bh)s, %(b)s)
+    ON CONFLICT (block_num) DO UPDATE SET block_hash = %(bh)s, block = %(b)s
     """
 
 
@@ -254,14 +255,4 @@ def delete_missing_blocks():
     return """
     DELETE FROM blocks_missing
     WHERE block_num = %(bn)s
-    """
-
-
-def block_exists():
-    return """
-    SELECT exists (
-      SELECT 1
-      FROM blocks
-      WHERE block_num = %(bn)s LIMIT 1
-    )
     """
