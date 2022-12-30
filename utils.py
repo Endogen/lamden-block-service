@@ -1,3 +1,4 @@
+# TODO: Append current PID to file
 def create_kill_script(path: str):
     import os
 
