@@ -8,33 +8,40 @@ import requests as r
 from config import Config
 from database import DB
 from loguru import logger
+from tgbot import TelegramBot
 from timeit import default_timer as timer
-from block import Block, WrongBlockDataException, InvalidBlockException
+from block import Block, Source, WrongBlockDataException, InvalidBlockException
 
 
 class Sync:
+
     cfg = None
     db = None
+    tgb = None
 
-    def __init__(self, config: Config, database: DB):
+    def __init__(self, config: Config, database: DB, tgbot: TelegramBot):
         self.cfg = config
         self.db = database
+        self.tgb = tgbot
 
-    def process(self, block: Block):
+    def process_block(self, block: Block):
         start_time = timer()
+
+        # Check for genesis block
+        if block.block_num == 0:
+            self.process_genesis_block()
+            return
 
         # SAVE BLOCK
 
-        self.db.execute(
-            sql.insert_block(),
+        self.db.execute(sql.insert_block(),
             {'bn': block.block_num, 'bh': block.hash, 'b': json.dumps(block.content)})
 
         logger.debug(f'Saved block {block.block_num} - {timer() - start_time} seconds')
 
         # SAVE TRANSACTION
 
-        self.db.execute(
-            sql.insert_transaction(),
+        self.db.execute(sql.insert_transaction(),
             {'h': block.tx['hash'], 't': json.dumps(block.tx), 'bn': block.block_num})
 
         logger.debug(f'Saved tx {block.tx["hash"]} - {timer() - start_time} seconds')
@@ -43,15 +50,13 @@ class Sync:
 
         if block.state:
             if block.is_valid:
-                self.db.execute(
-                    sql.insert_state_change(),
+                self.db.execute(sql.insert_state_change(),
                     {'txh': block.tx["hash"], 's': json.dumps(block.state)})
 
                 logger.debug(f'Saved state {block.state} - {timer() - start_time} seconds')
 
                 for kv in block.state:
-                    self.db.execute(
-                        sql.insert_current_state(),
+                    self.db.execute(sql.insert_current_state(),
                         {'txh': block.tx["hash"], 'k': kv['key'], 'v': json.dumps(kv['value'])})
 
                     logger.debug(f'Saved single state {kv["key"]} - {timer() - start_time} seconds')
@@ -63,8 +68,7 @@ class Sync:
         # SAVE CONTRACT
 
         if block.is_contract:
-            self.db.execute(
-                sql.insert_contract(),
+            self.db.execute(sql.insert_contract(),
                 {'txh': block.tx["hash"], 'n': block.contract, 'c': block.code,
                  'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003})
 
@@ -73,18 +77,15 @@ class Sync:
                          f'- {timer() - start_time} seconds')
 
         # SAVE ADDRESSES
-        for address in block.addresses:
-            self.db.execute(
-                sql.insert_address(),
-                {'a': address})
 
+        for address in block.addresses:
+            self.db.execute(sql.insert_address(), {'a': address})
             logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
 
         # SAVE REWARDS
 
         for rw in block.rewards:
-            self.db.execute(
-                sql.insert_reward(),
+            self.db.execute(sql.insert_reward(),
                 {'bn': block.block_num, 'k': rw['key'], 'v': json.dumps(rw['value']), 'r': json.dumps(rw['reward'])})
 
             logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
@@ -98,6 +99,10 @@ class Sync:
 
         logger.debug(f'Processed block {block.block_num} in {timer() - start_time} seconds')
 
+    def process_genesis_block(self):
+        # TODO
+        pass
+
     def save_block_in_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')
         file = os.path.join(block_dir, f'{block.block_num}.json')
@@ -107,7 +112,6 @@ class Sync:
             json.dump(block.content, f, sort_keys=True, indent=4)
             logger.debug(f'Saved block {block.block_num} to file')
 
-    # TODO: How to make sure that sync from CLI won't set values in config?
     def sync(self, start: int = None, end: int = None, check_db: bool = True):
         start_time = timer()
 
@@ -126,30 +130,43 @@ class Sync:
             logger.debug(f'Sync job --> Synchronized')
             return
 
+        # Should not happen
+        if sync_start < sync_end:
+            msg = f'Sync job --> sync_start {sync_start} < sync_end {sync_end}'
+
+            # Set sync values to do a full resync
+            self.cfg.set('sync_start', None)
+            self.cfg.set('sync_end', 0)
+
+            logger.warning(msg)
+            self.tgb.send(msg)
+
         block = self.get_block(sync_start, check_db=check_db)
 
         while block:
-            self.process(block)
+            # Process if data didn't come from DB
+            if block.source != Source.DB:
+                self.process_block(block)
 
-            # End sync if current block number is same as sync end
-            if block.block_num == sync_end:
+            # End sync if current block number is
+            # same as sync end or genesis block
+            if block.block_num in (sync_end, 0):
+                # New sync end is previous sync start
                 self.cfg.set('sync_end', sync_start)
+                # New sync start will be block_latest
+                self.cfg.set('sync_start', None)
                 break
 
+            # Get previous block
             block = self.get_block(block.prev, check_db=check_db)
 
-            # It's the genesis block
-            if block.block_num == 0:
-                # TODO: Process genesis block
-                break
-
+            # Set sync start to previous block number
             self.cfg.set('sync_start', block.block_num)
 
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
     def get_block(self, block_id: (int, str), check_db: bool = True) -> Block:
         """ 'block' param can either be block hash or block number """
-
         try:
             if check_db:
                 if isinstance(block_id, int):
@@ -161,7 +178,7 @@ class Sync:
 
                 if data:
                     logger.debug(f'Retrieved block {block_id} from database')
-                    return Block(data[0][2])
+                    return Block(data[0][2], source=Source.DB)
 
             for source in self.cfg.get('retrieve_state_from'):
                 host = source['host']
@@ -177,11 +194,17 @@ class Sync:
 
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
-                    return Block(data.json())
+                    return Block(data.json(), source=Source.WEB)
 
         except InvalidBlockException as e:
-            logger.exception(f'Block {block_id} - invalid: {e}')
+            msg = f'Block {block_id} - invalid: {e}'
+            logger.exception(msg)
+            self.tgb.send(msg)
         except WrongBlockDataException as e:
-            logger.exception(f'Block {block_id} - wrong data: {e}')
+            msg = f'Block {block_id} - wrong data: {e}'
+            logger.exception(msg)
+            self.tgb.send(msg)
         except Exception as e:
-            logger.exception(f'Block {block_id} - can not retrieve: {e}')
+            msg = f'Block {block_id} - can not retrieve: {e}'
+            logger.exception(msg)
+            self.tgb.send(msg)
