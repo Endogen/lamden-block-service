@@ -30,6 +30,8 @@ class TelegramBot:
 
         try:
             logger.info("Connecting bot...")
+            # TODO: app = ApplicationBuilder().token("YOUR TOKEN HERE").build()
+            # TODO: Check website for example: https://python-telegram-bot.org/
             self.updater = Updater(self.cfg.get("token"), request_kwargs=self.tgb_kwargs)
             logger.info("Checking bot token...")
             self.updater.bot.get_me()
