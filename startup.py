@@ -22,20 +22,20 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # TODO: Add possibility to integrate DB dump to start syncing fast
 # TODO: Add async block sync pool - distribute block numbers to sync jobs
 
-class LamdenSync:
+class Startup:
 
     db = None
     cfg = None
     wst = None
-    bot = None
+    tgb = None
     sync = None
     scheduler = None
 
-    def __init__(self, config: Config, database: DB, snyc: Sync, tgbot: TelegramBot):
+    def __init__(self, config: Config, database: DB, tgbot: TelegramBot, sync: Sync):
         self.cfg = config
         self.db = database
-        self.sync = snyc
-        self.bot = tgbot
+        self.tgb = tgbot
+        self.sync = sync
 
         self.__init_db()
         self.__init_sync()
@@ -88,7 +88,7 @@ class LamdenSync:
             except Exception as e:
                 msg = f'Websocket error: {e}'
                 logger.exception(msg)
-                self.bot.send(msg)
+                self.tgb.send(msg)
                 gc.collect()
 
             wait_secs = self.cfg.get('ws_reconnect')
@@ -107,7 +107,7 @@ class LamdenSync:
             self.cfg.set('block_latest', block.block_num)
         elif event == 'new_block':
             self.cfg.set('block_latest', block.block_num)
-            Thread(target=self.sync.process, args=[block]).start()
+            Thread(target=self.sync.process_block, args=[block]).start()
 
     def on_ping(self, ws, msg):
         logger.debug(f'Websocket got a PING')
@@ -125,11 +125,13 @@ class LamdenSync:
         logger.info("Websocket connection opened")
 
 
+# TODO: Make Singleton
 if __name__ == "__main__":
     utils.create_kill_script('stop')
 
-    db = DB(Config('cfg', 'db.json'))
     cfg = Config('cfg', 'sync.json')
+    db = DB(Config('cfg', 'db.json'))
+    tgb = TelegramBot(Config('cfg', 'tgbot.json'))
 
     logger.remove()
 
@@ -144,8 +146,4 @@ if __name__ == "__main__":
         level=cfg.get('log_level'),
         rotation='10 MB')
 
-    LamdenSync(
-        cfg,
-        db,
-        Sync(cfg, db),
-        TelegramBot(Config('cfg', 'tgbot.json')))
+    Startup(cfg, db, tgb, Sync(cfg, db, tgb))
