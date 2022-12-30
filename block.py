@@ -20,6 +20,7 @@ class Block:
     _prev = str()
     _number = -1
     _tx = dict()
+    _tx_hash = str()
     _is_valid = False
     _result = str()
     _state = dict()
@@ -60,6 +61,9 @@ class Block:
 
             # Save transaction
             self._tx = content['processed']
+
+            # Save transaction hash
+            self._tx_hash = content['processed']['hash']
 
             # Check for state in transaction
             if 'state' in content['processed']:
@@ -135,6 +139,10 @@ class Block:
     @property
     def tx(self) -> dict:
         return self._tx
+
+    @property
+    def tx_hash(self) -> str:
+        return self._tx_hash
 
     @property
     def is_valid(self) -> bool:
