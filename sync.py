@@ -28,49 +28,50 @@ class Sync:
         start_time = timer()
 
         # Check for genesis block
-        if block.block_num == 0:
+        if block.number == 0:
             self.process_genesis_block()
             return
 
         # SAVE BLOCK
 
         self.db.execute(sql.insert_block(),
-            {'bn': block.block_num, 'bh': block.hash, 'b': json.dumps(block.content)})
+                        {'n': block.number, 'h': block.hash, 'b': json.dumps(block.content), 'cr': block.timestamp})
 
-        logger.debug(f'Saved block {block.block_num} - {timer() - start_time} seconds')
+        logger.debug(f'Saved block {block.number} - {timer() - start_time} seconds')
 
         # SAVE TRANSACTION
 
         self.db.execute(sql.insert_transaction(),
-            {'h': block.tx['hash'], 't': json.dumps(block.tx), 'bn': block.block_num})
+                        {'bn': block.number, 'h': block.tx_hash, 't': json.dumps(block.tx), 'cr': block.timestamp})
 
-        logger.debug(f'Saved tx {block.tx["hash"]} - {timer() - start_time} seconds')
+        logger.debug(f'Saved tx {block.tx_hash} - {timer() - start_time} seconds')
 
         # SAVE STATE
 
         if block.state:
             if block.is_valid:
                 self.db.execute(sql.insert_state_change(),
-                    {'txh': block.tx["hash"], 's': json.dumps(block.state)})
+                    {'bn': block.number, 's': json.dumps(block.state), 'cr': block.timestamp})
 
                 logger.debug(f'Saved state {block.state} - {timer() - start_time} seconds')
 
                 for kv in block.state:
                     self.db.execute(sql.insert_current_state(),
-                        {'txh': block.tx["hash"], 'k': kv['key'], 'v': json.dumps(kv['value'])})
+                        {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
+                         'cr': block.timestamp, 'up': block.timestamp})
 
                     logger.debug(f'Saved single state {kv["key"]} - {timer() - start_time} seconds')
             else:
-                logger.debug(f'State not saved - tx {block.tx["hash"]} invalid')
+                logger.debug(f'State not saved - tx {block.tx_hash} invalid')
         else:
-            logger.debug(f'No state in tx {block.tx["hash"]}')
+            logger.debug(f'No state in tx {block.tx_hash}')
 
         # SAVE CONTRACT
 
         if block.is_contract:
             self.db.execute(sql.insert_contract(),
-                {'txh': block.tx["hash"], 'n': block.contract, 'c': block.code,
-                 'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003})
+                {'bn': block.number, 'n': block.contract, 'c': block.code,
+                 'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
 
             logger.debug(f'Saved contract {block.contract} '
                          f'(LST001={block.is_lst001}, LST002={block.is_lst002}, LST003={block.is_lst003}) '
@@ -79,14 +80,17 @@ class Sync:
         # SAVE ADDRESSES
 
         for address in block.addresses:
-            self.db.execute(sql.insert_address(), {'a': address})
+            self.db.execute(sql.insert_address(),
+                {'bn': block.number, 'a': address, 'cr': block.timestamp})
+
             logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
 
         # SAVE REWARDS
 
         for rw in block.rewards:
             self.db.execute(sql.insert_reward(),
-                {'bn': block.block_num, 'k': rw['key'], 'v': json.dumps(rw['value']), 'r': json.dumps(rw['reward'])})
+                            {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
+                             'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
             logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
 
@@ -95,22 +99,22 @@ class Sync:
         if self.cfg.get('save_blocks_to_file'):
             self.save_block_in_file(block)
 
-            logger.debug(f'Saved block {block.block_num} to file - {timer() - start_time} seconds')
+            logger.debug(f'Saved block {block.number} to file - {timer() - start_time} seconds')
 
-        logger.debug(f'Processed block {block.block_num} in {timer() - start_time} seconds')
+        logger.debug(f'Processed block {block.number} in {timer() - start_time} seconds')
 
     def process_genesis_block(self):
-        # TODO
+        # TODO: Process genesis block before anything else
         pass
 
     def save_block_in_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')
-        file = os.path.join(block_dir, f'{block.block_num}.json')
+        file = os.path.join(block_dir, f'{block.number}.json')
         os.makedirs(os.path.dirname(file), exist_ok=True)
 
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(block.content, f, sort_keys=True, indent=4)
-            logger.debug(f'Saved block {block.block_num} to file')
+            logger.debug(f'Saved block {block.number} to file')
 
     def sync(self, start: int = None, end: int = None, check_db: bool = True):
         start_time = timer()
@@ -150,7 +154,7 @@ class Sync:
 
             # End sync if current block number is
             # same as sync end or genesis block
-            if block.block_num in (sync_end, 0):
+            if block.number in (sync_end, 0):
                 # New sync end is previous sync start
                 self.cfg.set('sync_end', sync_start)
                 # New sync start will be block_latest
@@ -161,7 +165,7 @@ class Sync:
             block = self.get_block(block.prev, check_db=check_db)
 
             # Set sync start to previous block number
-            self.cfg.set('sync_start', block.block_num)
+            self.cfg.set('sync_start', block.number)
 
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 

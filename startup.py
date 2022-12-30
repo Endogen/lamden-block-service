@@ -104,9 +104,9 @@ class Startup:
         block = Block(data)
 
         if event == 'latest_block':
-            self.cfg.set('block_latest', block.block_num)
+            self.cfg.set('block_latest', block.number)
         elif event == 'new_block':
-            self.cfg.set('block_latest', block.block_num)
+            self.cfg.set('block_latest', block.number)
             Thread(target=self.sync.process_block, args=[block]).start()
 
     def on_ping(self, ws, msg):
