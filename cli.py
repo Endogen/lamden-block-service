@@ -1,7 +1,6 @@
 import os
 import sys
 import typer
-import sql
 
 from typing import List
 from loguru import logger
@@ -9,11 +8,13 @@ from sync import Sync
 from config import Config
 from database import DB
 from datetime import timedelta
-from sync import State
+from tgbot import TelegramBot
 
 # TODO: Check if all blocks are in DB
 # TODO: Check if all blocks on HDD
+# TODO: Syncing blocks will mess with sync_start and sync_end - what to do?
 
+tgb = TelegramBot(Config('cfg', 'tgbot.json'))
 db = DB(Config('cfg', 'db.json'))
 cfg = Config('cfg', 'cli.json')
 app = typer.Typer()
@@ -41,7 +42,7 @@ def sync_blocks(block_nums: List[int]):
         state, block = sync.get_block(block_num)
 
         if state == State.OK:
-            sync.process(block)
+            sync.process_block(block)
 
 
 @app.command()
@@ -50,7 +51,7 @@ def sync_block_range(from_block_num: int, to_block_num: int):
         state, block = sync.get_block(block_num)
 
         if state == State.OK:
-            sync.process(block)
+            sync.process_block(block)
 
 
 @app.command()
@@ -59,21 +60,7 @@ def sync_blocks_from(start_block_num: int):
         state, block = sync.get_block(block_num)
 
         if state == State.OK:
-            sync.process(block)
-
-
-@app.command()
-def sync_missing_blocks():
-    missing = sync.db.execute(sql.select_missing_blocks())
-    missing = [x[0] for x in missing]
-    missing = list(set(missing))
-    missing.sort(key=int)
-
-    for block_num in missing:
-        state, block = sync.get_block(block_num)
-
-        if state == State.OK:
-            sync.process(block)
+            sync.process_block(block)
 
 
 app()
