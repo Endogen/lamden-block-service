@@ -13,6 +13,7 @@ from tgbot import TelegramBot
 # TODO: Check if all blocks are in DB
 # TODO: Check if all blocks on HDD
 # TODO: Syncing blocks will mess with sync_start and sync_end - what to do?
+# TODO: Add possibility to execute raw SQL statement with no predefined statement
 
 tgb = TelegramBot(Config('cfg', 'tgbot.json'))
 db = DB(Config('cfg', 'db.json'))
