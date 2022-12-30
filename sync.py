@@ -20,10 +20,6 @@ class Sync:
         self.cfg = config
         self.db = database
 
-        # Save block hash of genesis block
-        if not self.cfg.get('genesis_block_hash'):
-            self.cfg.set('genesis_block_hash', self.get_block(0).hash)
-
     def process(self, block: Block):
         start_time = timer()
 
@@ -31,7 +27,7 @@ class Sync:
 
         self.db.execute(
             sql.insert_block(),
-            {'bn': block.block_num, 'b': json.dumps(block.content)})
+            {'bn': block.block_num, 'bh': block.hash, 'b': json.dumps(block.content)})
 
         logger.debug(f'Saved block {block.block_num} - {timer() - start_time} seconds')
 
@@ -112,7 +108,7 @@ class Sync:
             logger.debug(f'Saved block {block.block_num} to file')
 
     # TODO: How to make sure that sync from CLI won't set values in config?
-    def sync(self, start: int = None, end: int = None, process_existing: bool = False):
+    def sync(self, start: int = None, end: int = None, check_db: bool = True):
         start_time = timer()
 
         logger.debug(f'Sync job --> Started...')
@@ -130,58 +126,62 @@ class Sync:
             logger.debug(f'Sync job --> Synchronized')
             return
 
-        block = self.get_block(sync_start)
+        block = self.get_block(sync_start, check_db=check_db)
 
         while block:
-            # Check if block already exists in database
-            if self.db.execute(sql.block_exists(), {'bn': block.block_num})[0][0]:
-                if process_existing:
-                    self.process(block)
-                    logger.debug(f'Block {block.block_num} exists - processing...')
-                else:
-                    # TODO: Read block from DB and set 'sync_start = block.block_num'
-                    logger.debug(f'Block {block.block_num} exists - skipping...')
-            else:
-                self.process(block)
+            self.process(block)
 
             # End sync if current block number is same as sync end
             if block.block_num == sync_end:
                 self.cfg.set('sync_end', sync_start)
                 break
 
-            # If previous block is genesis block, process it separately
-            # Genesis block is special and differs from normal blocks
-            if block.prev == self.cfg.get('genesis_block_hash'):
+            block = self.get_block(block.prev, check_db=check_db)
+
+            # It's the genesis block
+            if block.block_num == 0:
                 # TODO: Process genesis block
                 break
 
-            block = self.get_block(block.prev)
             self.cfg.set('sync_start', block.block_num)
 
         logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
 
-    def get_block(self, block: (int, str)) -> Block:
+    def get_block(self, block_id: (int, str), check_db: bool = True) -> Block:
         """ 'block' param can either be block hash or block number """
 
-        for source in self.cfg.get('retrieve_state_from'):
-            host = source['host']
-            wait = source['wait']
+        try:
+            if check_db:
+                if isinstance(block_id, int):
+                    # 'block_id' is Block Number
+                    data = self.db.execute(sql.select_block_by_num(), {'bn': block_id})
+                else:
+                    # 'block_id' is Block Hash
+                    data = self.db.execute(sql.select_block_by_hash(), {'bh': block_id})
 
-            if wait:
-                logger.debug(f'Waiting for {wait} seconds...')
-                time.sleep(wait)
+                if data:
+                    logger.debug(f'Retrieved block {block_id} from database')
+                    return Block(data[0][2])
 
-            host = host.replace('{block}', str(block))
-            logger.debug(f'Retrieving block from {host}')
+            for source in self.cfg.get('retrieve_state_from'):
+                host = source['host']
+                wait = source['wait']
 
-            try:
+                logger.debug(f'Retrieving block {block_id} from {host}')
+
+                if wait:
+                    logger.debug(f'Waiting for {wait} seconds...')
+                    time.sleep(wait)
+
+                host = host.replace('{block}', str(block_id))
+
                 with r.get(host) as data:
-                    logger.info(f'Block {block} --> {data.text}')
+                    logger.info(f'Block {block_id} --> {data.text}')
                     return Block(data.json())
 
-            except InvalidBlockException as e:
-                logger.exception(f'Block {block} - invalid: {e}')
-            except WrongBlockDataException as e:
-                logger.exception(f'Block {block} - wrong data: {e}')
-            except Exception as e:
-                logger.exception(f'Block {block} - can not retrieve: {e}')
+        except InvalidBlockException as e:
+            logger.exception(f'Block {block_id} - invalid: {e}')
+        except WrongBlockDataException as e:
+            logger.exception(f'Block {block_id} - wrong data: {e}')
+        except Exception as e:
+            logger.exception(f'Block {block_id} - can not retrieve: {e}')
