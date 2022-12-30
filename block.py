@@ -46,6 +46,10 @@ class Block:
             # Previous block hash
             self._prev = content['previous']
 
+            # It's the genesis block
+            if self._block_num == 0:
+                return
+
             # Save transaction
             self._tx = content['processed']
 
