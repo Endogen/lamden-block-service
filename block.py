@@ -6,7 +6,13 @@ class InvalidBlockException(Exception):
     pass
 
 
+class Source:
+    DB = 0
+    WEB = 1
+
+
 class Block:
+    _source = None
 
     _content = dict()
     _hash = str()
@@ -26,7 +32,9 @@ class Block:
     _is_lst003 = False
     _addresses = list()
 
-    def __init__(self, content: dict):
+    def __init__(self, content: dict, source: Source):
+        self._source = source
+
         if 'error' in content:
             raise InvalidBlockException(content['error'])
 
@@ -99,6 +107,10 @@ class Block:
 
         except Exception as e:
             raise WrongBlockDataException(repr(e))
+
+    @property
+    def source(self) -> Source:
+        return self._source
 
     @property
     def content(self) -> dict:
