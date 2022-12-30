@@ -18,7 +18,7 @@ class Block:
     _hash = str()
     _timestamp = str()
     _prev = str()
-    _block_num = -1
+    _number = -1
     _tx = dict()
     _is_valid = False
     _result = str()
@@ -46,16 +46,16 @@ class Block:
             self._hash = content['hash']
 
             # HLC timestamp
-            self._timestamp = content['hlc_timestamp']
+            self._timestamp = content['hlc_timestamp'].replace('Z_0', '')
 
             # Block number
-            self._block_num = int(content['number'])
+            self._number = int(content['number'])
 
             # Previous block hash
             self._prev = content['previous']
 
             # It's the genesis block
-            if self._block_num == 0:
+            if self._number == 0:
                 return
 
             # Save transaction
@@ -121,8 +121,8 @@ class Block:
         return self._hash
 
     @property
-    def block_num(self) -> int:
-        return self._block_num
+    def number(self) -> int:
+        return self._number
 
     @property
     def timestamp(self) -> str:
