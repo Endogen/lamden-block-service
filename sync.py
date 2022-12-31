@@ -50,21 +50,20 @@ class Sync:
 
         if block.state:
             if block.is_valid:
-                self.db.execute(sql.insert_state_change(),
-                    {'bn': block.number, 's': json.dumps(block.state), 'cr': block.timestamp})
-
-                logger.debug(f'Saved state {block.state} - {timer() - start_time} seconds')
-
                 for kv in block.state:
-                    self.db.execute(sql.insert_current_state(),
+                    # Check if state is already known and newer than current data
+                    data = self.db.execute(sql.select_state(), {'k': kv['key']})
+                    if data[0] and data[0][0] > block.number:
+                        logger.debug(f'State {kv["key"]} already up to date - {timer() - start_time} seconds')
+                        break
+
+                    self.db.execute(sql.insert_state(),
                         {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
                          'cr': block.timestamp, 'up': block.timestamp})
 
-                    logger.debug(f'Saved single state {kv["key"]} - {timer() - start_time} seconds')
+                    logger.debug(f'Saved state {kv} - {timer() - start_time} seconds')
             else:
                 logger.debug(f'State not saved - tx {block.tx_hash} invalid')
-        else:
-            logger.debug(f'No state in tx {block.tx_hash}')
 
         # SAVE CONTRACT
 
@@ -80,6 +79,12 @@ class Sync:
         # SAVE ADDRESSES
 
         for address in block.addresses:
+            # Check if address is already known and older than current data
+            data = self.db.execute(sql.select_address(), {'a': address})
+            if data[0] and data[0][0] < block.number:
+                logger.debug(f'Address {address} already present - {timer() - start_time} seconds')
+                break
+
             self.db.execute(sql.insert_address(),
                 {'bn': block.number, 'a': address, 'cr': block.timestamp})
 
