@@ -35,23 +35,13 @@ def create_contracts():
     """
 
 
-def create_current_state():
+def create_state():
     return """
-    CREATE TABLE IF NOT EXISTS current_state (
+    CREATE TABLE IF NOT EXISTS state (
       block_num BIGINT NOT NULL REFERENCES blocks (number),
       key text NOT NULL PRIMARY KEY,
       value jsonb NOT NULL,
       updated TIMESTAMP NOT NULL,
-      created TIMESTAMP NOT NULL
-    )
-    """
-
-
-def create_state_change():
-    return """
-    CREATE TABLE IF NOT EXISTS state_change (
-      block_num BIGINT NOT NULL PRIMARY KEY REFERENCES blocks (number),
-      state jsonb NOT NULL,
       created TIMESTAMP NOT NULL
     )
     """
@@ -109,24 +99,28 @@ def select_holders(contract: str, addresses: bool = True, contracts: bool = True
 # TODO: Rework to use params like all other statements
 def select_balance(address: str, contract: str = None):
     return f"SELECT (CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) " \
-           f"FROM current_state WHERE key LIKE '{contract}.balances:{address}'"
+           f"FROM state WHERE key LIKE '{contract}.balances:{address}'"
 
 
 # TODO: Rework to use params like all other statements
 def select_balances(address: str):
     return f"SELECT substring(key from 0 for position('.' in key)), " \
            f"(CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) " \
-           f"FROM current_state " \
+           f"FROM state " \
            f"WHERE key LIKE '%balances:{address}' AND (value->>'__fixed__')::decimal != 0" \
            f"ORDER BY key"
 
 
 def select_block_by_num():
-    return f"SELECT * FROM blocks WHERE number = %(bn)s"
+    return "SELECT * FROM blocks WHERE number = %(bn)s"
 
 
 def select_block_by_hash():
-    return f"SELECT * FROM blocks WHERE hash = %(bh)s"
+    return "SELECT * FROM blocks WHERE hash = %(bh)s"
+
+
+def select_address():
+    return "SELECT * FROM addresses WHERE address = %(a)s"
 
 
 def select_contract():
@@ -159,20 +153,8 @@ def select_contracts():
     """
 
 
-def select_state_change():
-    return """
-    SELECT *
-    FROM state_change
-    WHERE block_num = %(bn)s
-    """
-
-
-def select_current_state():
-    return """
-    SELECT *
-    FROM current_state
-    WHERE key LIKE %(k)s
-    """
+def select_state():
+    return "SELECT * FROM state WHERE key LIKE %(k)s"
 
 
 def insert_block():
@@ -211,21 +193,13 @@ def insert_reward():
     return """
     INSERT INTO rewards(block_num, key, value, reward, created)
     VALUES (%(bn)s, %(k)s, %(v)s, %(r)s, %(cr)s)
-    ON CONFLICT (block_num, key) DO UPDATE SET block_num = %(bn)s, key = %(k)s, value = %(v)s, reward = %(r)s, created = %(cr)s
+    ON CONFLICT (block_num, key) DO UPDATE SET value = %(v)s, reward = %(r)s, created = %(cr)s
     """
 
 
-def insert_state_change():
+def insert_state():
     return """
-    INSERT INTO state_change(block_num, state, created)
-    VALUES (%(bn)s, %(s)s, %(cr)s)
-    ON CONFLICT (block_num) DO UPDATE SET state = %(s)s, created = %(cr)s
-    """
-
-
-def insert_current_state():
-    return """
-    INSERT INTO current_state(block_num, key, value, created, updated)
+    INSERT INTO state(block_num, key, value, created, updated)
     VALUES (%(bn)s, %(k)s, %(v)s, %(cr)s, %(up)s)
     ON CONFLICT (key) DO UPDATE SET block_num = %(bn)s, value = %(v)s, updated = %(up)s
     """
