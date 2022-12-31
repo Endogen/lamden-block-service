@@ -53,7 +53,7 @@ class Sync:
                 for kv in block.state:
                     # Check if state is already known and newer than current data
                     data = self.db.execute(sql.select_state(), {'k': kv['key']})
-                    if data[0] and data[0][0] > block.number:
+                    if data and data[0][0] > block.number:
                         logger.debug(f'State {kv["key"]} already up to date - {timer() - start_time} seconds')
                         break
 
@@ -81,7 +81,7 @@ class Sync:
         for address in block.addresses:
             # Check if address is already known and older than current data
             data = self.db.execute(sql.select_address(), {'a': address})
-            if data[0] and data[0][0] < block.number:
+            if data and data[0][0] < block.number:
                 logger.debug(f'Address {address} already present - {timer() - start_time} seconds')
                 break
 
