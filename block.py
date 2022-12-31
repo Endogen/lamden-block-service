@@ -92,8 +92,8 @@ class Block:
             # Check FROM address
             if self._is_valid_address(pld['sender']):
                 self._addresses.append(pld['sender'])
-            # Check TO address
-            if 'to' in pld['kwargs']:
+            # Check TO address (if it exists)
+            if 'kwargs' in pld and 'to' in pld['kwargs']:
                 if self._is_valid_address(pld['kwargs']['to']):
                     self._addresses.append(pld['kwargs']['to'])
 
