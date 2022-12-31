@@ -45,11 +45,10 @@ class Startup:
         try:
             self.db.execute(sql.create_blocks())
             self.db.execute(sql.create_transactions())
-            self.db.execute(sql.create_state_change())
-            self.db.execute(sql.create_current_state())
+            self.db.execute(sql.create_state())
+            self.db.execute(sql.create_rewards())
             self.db.execute(sql.create_contracts())
             self.db.execute(sql.create_addresses())
-            self.db.execute(sql.create_rewards())
         except Exception as e:
             logger.exception(e)
             raise SystemExit
