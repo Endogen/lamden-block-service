@@ -35,14 +35,14 @@ class Sync:
         # SAVE BLOCK
 
         self.db.execute(sql.insert_block(),
-                        {'n': block.number, 'h': block.hash, 'b': json.dumps(block.content), 'cr': block.timestamp})
+            {'n': block.number, 'h': block.hash, 'b': json.dumps(block.content), 'cr': block.timestamp})
 
         logger.debug(f'Saved block {block.number} - {timer() - start_time} seconds')
 
         # SAVE TRANSACTION
 
         self.db.execute(sql.insert_transaction(),
-                        {'bn': block.number, 'h': block.tx_hash, 't': json.dumps(block.tx), 'cr': block.timestamp})
+            {'bn': block.number, 'h': block.tx_hash, 't': json.dumps(block.tx), 'cr': block.timestamp})
 
         logger.debug(f'Saved tx {block.tx_hash} - {timer() - start_time} seconds')
 
@@ -94,8 +94,8 @@ class Sync:
 
         for rw in block.rewards:
             self.db.execute(sql.insert_reward(),
-                            {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
-                             'r': json.dumps(rw['reward']), 'cr': block.timestamp})
+                {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
+                'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
             logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
 
@@ -119,7 +119,6 @@ class Sync:
 
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(block.content, f, sort_keys=True, indent=4)
-            logger.debug(f'Saved block {block.number} to file')
 
     def sync(self, start: int = None, end: int = None, check_db: bool = True):
         start_time = timer()
@@ -189,7 +188,7 @@ class Sync:
                     logger.debug(f'Retrieved block {block_id} from database')
                     return Block(data[0][2], source=Source.DB)
 
-            for source in self.cfg.get('retrieve_state_from'):
+            for source in self.cfg.get('retrieve_from'):
                 host = source['host']
                 wait = source['wait']
 

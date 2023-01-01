@@ -2,9 +2,9 @@
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-v2",
     "block_latest": null,
     "job_interval_sync": 10,
-    "log_level": "DEBUG",
+    "log_level": "INFO",
     "log_retention": 3,
-    "retrieve_state_from": [
+    "retrieve_from": [
         {
             "host": "https://testnet-v2-bs-lon.lamden.io/blocks/{block}",
             "wait": 0
