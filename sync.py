@@ -175,44 +175,45 @@ class Sync:
 
     def get_block(self, block_id: (int, str), check_db: bool = True) -> Block:
         """ 'block' param can either be block hash or block number """
-        try:
-            if check_db:
-                if isinstance(block_id, int):
-                    # 'block_id' is Block Number
-                    data = self.db.execute(sql.select_block_by_num(), {'bn': block_id})
-                else:
-                    # 'block_id' is Block Hash
-                    data = self.db.execute(sql.select_block_by_hash(), {'bh': block_id})
 
-                if data:
-                    logger.debug(f'Retrieved block {block_id} from database')
-                    return Block(data[0][2], source=Source.DB)
+        if check_db:
+            if isinstance(block_id, int):
+                # 'block_id' is Block Number
+                data = self.db.execute(sql.select_block_by_num(), {'bn': block_id})
+            else:
+                # 'block_id' is Block Hash
+                data = self.db.execute(sql.select_block_by_hash(), {'bh': block_id})
 
-            for source in self.cfg.get('retrieve_from'):
-                host = source['host']
-                wait = source['wait']
+            if data:
+                logger.debug(f'Retrieved block {block_id} from database')
+                return Block(data[0][2], source=Source.DB)
 
-                logger.debug(f'Retrieving block {block_id} from {host}')
+        for source in self.cfg.get('retrieve_from'):
+            host = source['host']
+            wait = source['wait']
 
-                if wait:
-                    logger.debug(f'Waiting for {wait} seconds...')
-                    time.sleep(wait)
+            logger.debug(f'Retrieving block {block_id} from {host}')
 
-                host = host.replace('{block}', str(block_id))
+            if wait:
+                logger.debug(f'Waiting for {wait} seconds...')
+                time.sleep(wait)
+
+            host = host.replace('{block}', str(block_id))
+
+            try:
 
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
                     return Block(data.json(), source=Source.WEB)
 
-        except InvalidBlockException as e:
-            msg = f'Block {block_id} - invalid: {e}'
-            logger.exception(msg)
-            self.tgb.send(msg)
-        except WrongBlockDataException as e:
-            msg = f'Block {block_id} - wrong data: {e}'
-            logger.exception(msg)
-            self.tgb.send(msg)
-        except Exception as e:
-            msg = f'Block {block_id} - can not retrieve: {e}'
-            logger.exception(msg)
-            self.tgb.send(msg)
+            except InvalidBlockException as e:
+                msg = f'Block {block_id} - invalid: {e}'
+                logger.exception(msg)
+            except WrongBlockDataException as e:
+                msg = f'Block {block_id} - wrong data: {e}'
+                logger.exception(msg)
+            except Exception as e:
+                msg = f'Block {block_id} - can not retrieve: {e}'
+                logger.exception(msg)
+
+        self.tgb.send(f'Could not retrieve block {block_id}')
