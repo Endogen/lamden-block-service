@@ -148,6 +148,7 @@ class Sync:
 
             logger.warning(msg)
             self.tgb.send(msg)
+            return
 
         block = self.get_block(sync_start, check_db=check_db)
 
