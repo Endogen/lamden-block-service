@@ -12,26 +12,6 @@ class Source:
 
 
 class Block:
-    _source = None
-
-    _content = dict()
-    _hash = str()
-    _timestamp = str()
-    _prev = str()
-    _number = -1
-    _tx = dict()
-    _tx_hash = str()
-    _is_valid = False
-    _result = str()
-    _state = dict()
-    _rewards = dict()
-    _is_contract = False
-    _contract = str()
-    _code = str()
-    _is_lst001 = False
-    _is_lst002 = False
-    _is_lst003 = False
-    _addresses = list()
 
     def __init__(self, content: dict, source: Source):
         self._source = source
@@ -72,6 +52,8 @@ class Block:
 
                 # Remove state from transaction itself
                 del self._tx['state']
+            else:
+                self._state = dict()
 
             # Transaction was valid or not
             status = content['processed']['status']
@@ -89,13 +71,15 @@ class Block:
             con = pld['contract']
             fun = pld['function']
 
+            self._addresses = set()
+
             # Check FROM address
             if self._is_valid_address(pld['sender']):
-                self._addresses.append(pld['sender'])
+                self._addresses.add(pld['sender'])
             # Check TO address (if it exists)
             if 'kwargs' in pld and 'to' in pld['kwargs']:
                 if self._is_valid_address(pld['kwargs']['to']):
-                    self._addresses.append(pld['kwargs']['to'])
+                    self._addresses.add(pld['kwargs']['to'])
 
             # Check if new contract was submitted
             if con == 'submission' and fun == 'submit_contract':
@@ -108,6 +92,14 @@ class Block:
                 self._is_lst001 = self._con_is_lst001(kwargs['code'])
                 self._is_lst002 = self._con_is_lst002(kwargs['code'])
                 self._is_lst003 = self._con_is_lst003(kwargs['code'])
+            else:
+                self._is_contract = False
+                self._contract = None
+                self._code = None
+
+                self._is_lst001 = False
+                self._is_lst002 = False
+                self._is_lst003 = False
 
         except Exception as e:
             raise WrongBlockDataException(repr(e))
@@ -186,7 +178,7 @@ class Block:
 
     @property
     def addresses(self) -> list:
-        return self._addresses
+        return list(self._addresses)
 
     def _con_is_lst001(self, code: str) -> bool:
         code = code.replace(' ', '')
