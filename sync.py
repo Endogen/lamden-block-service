@@ -154,7 +154,7 @@ class Sync:
 
         while block:
             # Process if data didn't come from DB
-            if block.source != Source.DB:
+            if block.source == Source.WEB:
                 self.process_block(block)
 
             # End sync if current block number is
