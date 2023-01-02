@@ -46,29 +46,26 @@ class Sync:
 
         logger.debug(f'Saved tx {block.tx_hash} - {timer() - start_time} seconds')
 
-        # SAVE STATE
+        if block.is_valid:
 
-        if block.state:
-            if block.is_valid:
-                for kv in block.state:
-                    # Check if state is already known and newer than current data
-                    data = self.db.execute(sql.select_state(), {'k': kv['key']})
-                    if data and data[0][0] > block.number:
-                        logger.debug(f'State {kv["key"]} already up to date - {timer() - start_time} seconds')
-                        break
+            # SAVE STATE
 
-                    self.db.execute(sql.insert_state(),
-                        {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
-                         'cr': block.timestamp, 'up': block.timestamp})
+            for kv in block.state:
+                # Check if state is already known and newer than current data
+                data = self.db.execute(sql.select_state(), {'k': kv['key']})
+                if data and data[0][0] > block.number:
+                    logger.debug(f'State {kv["key"]} already up to date - {timer() - start_time} seconds')
+                    break
 
-                    logger.debug(f'Saved state {kv} - {timer() - start_time} seconds')
-            else:
-                logger.debug(f'State not saved - tx {block.tx_hash} invalid')
+                self.db.execute(sql.insert_state(),
+                    {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
+                     'cr': block.timestamp, 'up': block.timestamp})
 
-        # SAVE REWARDS
+                logger.debug(f'Saved state {kv} - {timer() - start_time} seconds')
 
-        for rw in block.rewards:
-            if block.is_valid:
+            # SAVE REWARDS
+
+            for rw in block.rewards:
                 # Save rewards in rewards table
                 self.db.execute(sql.insert_reward(),
                     {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
@@ -81,32 +78,32 @@ class Sync:
                     {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
                      'cr': block.timestamp, 'up': block.timestamp})
 
-                logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
+            logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
 
-        # SAVE CONTRACT
+            # SAVE CONTRACT
 
-        if block.is_contract:
-            self.db.execute(sql.insert_contract(),
-                {'bn': block.number, 'n': block.contract, 'c': block.code,
-                 'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
+            if block.is_contract:
+                self.db.execute(sql.insert_contract(),
+                    {'bn': block.number, 'n': block.contract, 'c': block.code,
+                     'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
 
-            logger.debug(f'Saved contract {block.contract} '
-                         f'(LST001={block.is_lst001}, LST002={block.is_lst002}, LST003={block.is_lst003}) '
-                         f'- {timer() - start_time} seconds')
+                logger.debug(f'Saved contract {block.contract} '
+                             f'(LST001={block.is_lst001}, LST002={block.is_lst002}, LST003={block.is_lst003}) '
+                             f'- {timer() - start_time} seconds')
 
-        # SAVE ADDRESSES
+            # SAVE ADDRESSES
 
-        for address in block.addresses:
-            # Check if address is already known and older than current data
-            data = self.db.execute(sql.select_address(), {'a': address})
+            for address in block.addresses:
+                # Check if address is already known and older than current data
+                data = self.db.execute(sql.select_address(), {'a': address})
 
-            if data and data[0][0] < block.number:
-                logger.debug(f'Address {address} already present - {timer() - start_time} seconds')
-            else:
-                self.db.execute(sql.insert_address(),
-                    {'bn': block.number, 'a': address, 'cr': block.timestamp})
+                if data and data[0][0] < block.number:
+                    logger.debug(f'Address {address} already present - {timer() - start_time} seconds')
+                else:
+                    self.db.execute(sql.insert_address(),
+                        {'bn': block.number, 'a': address, 'cr': block.timestamp})
 
-                logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
+                    logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
 
         # SAVE BLOCK TO FILE
 
