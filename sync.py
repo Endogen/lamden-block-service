@@ -65,6 +65,24 @@ class Sync:
             else:
                 logger.debug(f'State not saved - tx {block.tx_hash} invalid')
 
+        # SAVE REWARDS
+
+        for rw in block.rewards:
+            if block.is_valid:
+                # Save rewards in rewards table
+                self.db.execute(sql.insert_reward(),
+                    {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
+                     'r': json.dumps(rw['reward']), 'cr': block.timestamp})
+
+                logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
+
+                # Save rewards in state table
+                self.db.execute(sql.insert_state(),
+                    {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
+                     'cr': block.timestamp, 'up': block.timestamp})
+
+                logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
+
         # SAVE CONTRACT
 
         if block.is_contract:
@@ -89,15 +107,6 @@ class Sync:
                     {'bn': block.number, 'a': address, 'cr': block.timestamp})
 
                 logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
-
-        # SAVE REWARDS
-
-        for rw in block.rewards:
-            self.db.execute(sql.insert_reward(),
-                {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
-                'r': json.dumps(rw['reward']), 'cr': block.timestamp})
-
-            logger.debug(f'Saved rewards {rw} - {timer() - start_time} seconds')
 
         # SAVE BLOCK TO FILE
 
