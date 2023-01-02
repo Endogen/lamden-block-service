@@ -81,14 +81,14 @@ class Sync:
         for address in block.addresses:
             # Check if address is already known and older than current data
             data = self.db.execute(sql.select_address(), {'a': address})
+
             if data and data[0][0] < block.number:
                 logger.debug(f'Address {address} already present - {timer() - start_time} seconds')
-                break
+            else:
+                self.db.execute(sql.insert_address(),
+                    {'bn': block.number, 'a': address, 'cr': block.timestamp})
 
-            self.db.execute(sql.insert_address(),
-                {'bn': block.number, 'a': address, 'cr': block.timestamp})
-
-            logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
+                logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
 
         # SAVE REWARDS
 
