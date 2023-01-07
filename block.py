@@ -37,8 +37,7 @@ class Block:
 
             # It's the genesis block
             if self._number == 0:
-                # TODO: Need to process file - outside of this class
-                self._genesis = content['genesis']
+                self._state = content['genesis']
                 return
 
             # Save transaction
