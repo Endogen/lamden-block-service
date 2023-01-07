@@ -67,7 +67,7 @@ class Block:
             # Distributed rewards to node owners
             self._rewards = content['rewards']
             # Add rewards to state
-            self._state = self._state | self._rewards
+            self._state = self._state + self._rewards
 
             # Transaction payload
             pld = content['processed']['transaction']['payload']
