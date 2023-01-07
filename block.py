@@ -37,6 +37,8 @@ class Block:
 
             # It's the genesis block
             if self._number == 0:
+                # TODO: Need to process file - outside of this class
+                self._genesis = content['genesis']
                 return
 
             # Save transaction
@@ -63,8 +65,10 @@ class Block:
             result = content['processed']['result']
             self._result = None if result == "None" else result
 
-            # Distributed rewards
+            # Distributed rewards to node owners
             self._rewards = content['rewards']
+            # Add rewards to state
+            self._state = self._state | self._rewards
 
             # Transaction payload
             pld = content['processed']['transaction']['payload']
