@@ -148,7 +148,7 @@ class Block:
         return self._result
 
     @property
-    def state(self) -> dict:
+    def state(self) -> list:
         return self._state
 
     @property
