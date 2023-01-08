@@ -19,7 +19,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 # TODO: Switch to Poetry
-# TODO: Add possibility to integrate DB dump to start syncing fast
 
 class Startup:
 
