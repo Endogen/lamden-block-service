@@ -29,96 +29,99 @@ class Sync:
 
         # Check for genesis block
         if block.number == 0:
-            self.insert_state(block.state, block, start_time)
-            logger.debug(f'-> Saved genesis block {block.number} - {timer() - start_time} seconds')
+
+            # SAVE GENESIS BLOCK
+            self.insert_block(block)
+            # SAVE GENESIS STATE
+            self.insert_state(block)
+
+            logger.debug(f'-> Saved genesis block - {timer() - start_time} seconds')
             return
 
         # SAVE BLOCK
-
-        self.db.execute(sql.insert_block(),
-            {'n': block.number, 'h': block.hash, 'b': json.dumps(block.content), 'cr': block.timestamp})
-
+        self.insert_block(block)
         logger.debug(f'-> Saved block {block.number} - {timer() - start_time} seconds')
 
         # SAVE TRANSACTION
+        self.insert_tx(block)
+        logger.debug(f'-> Saved tx {block.tx_hash} - {timer() - start_time} seconds')
 
+        # SAVE REWARDS
+        self.insert_rewards(block)
+        logger.debug(f'-> Saved rewards {block.rewards} - {timer() - start_time} seconds')
+
+        # SAVE REWARDS STATE
+        self.insert_state(block, 'rewards')
+        logger.debug(f'-> Saved rewards state - {timer() - start_time} seconds')
+
+        if block.tx_is_valid:
+
+            # SAVE STATE
+            self.insert_state(block)
+            logger.debug(f'-> Saved state - {timer() - start_time} seconds')
+
+            # SAVE ADDRESSES
+            self.insert_address(block)
+            logger.debug(f'-> Saved addresses - {timer() - start_time} seconds')
+
+            if block.is_new_contract:
+
+                # SAVE CONTRACT
+                self.insert_contract(block)
+                logger.debug(f'-> Saved contract {block.contract} - {timer() - start_time} seconds')
+
+        if self.cfg.get('save_blocks_to_file'):
+
+            # SAVE BLOCK TO FILE
+            self.save_block_to_file(block)
+            logger.debug(f'-> Saved block {block.number} to file - {timer() - start_time} seconds')
+
+        logger.debug(f'Finished processing block {block.number} - {timer() - start_time} seconds')
+
+    def insert_block(self, block: Block):
+        self.db.execute(sql.insert_block(),
+            {'n': block.number, 'h': block.hash, 'b': json.dumps(block.content), 'cr': block.timestamp})
+
+    def insert_tx(self, block: Block):
         self.db.execute(sql.insert_transaction(),
             {'bn': block.number, 'h': block.tx_hash, 't': json.dumps(block.tx), 'cr': block.timestamp})
 
-        logger.debug(f'-> Saved tx {block.tx_hash} - {timer() - start_time} seconds')
+    def insert_rewards(self, block: Block):
+        for rw in block.rewards:
+            self.db.execute(sql.insert_reward(),
+                {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
+                'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
-        if block.is_valid:
-
-            # SAVE STATE
-
-            self.insert_state(block.state, block, start_time)
-
-            # SAVE REWARDS
-
-            for rw in block.rewards:
-                self.db.execute(sql.insert_reward(),
-                    {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
-                     'r': json.dumps(rw['reward']), 'cr': block.timestamp})
-
-                logger.debug(f'-> Saved reward {rw} - {timer() - start_time} seconds')
-
-            logger.debug(f'-> Saved rewards {block.rewards} - {timer() - start_time} seconds')
-
-            # SAVE CONTRACT
-
-            if block.is_contract:
-                self.db.execute(sql.insert_contract(),
-                    {'bn': block.number, 'n': block.contract, 'c': block.code,
-                     'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
-
-                logger.debug(f'Saved contract {block.contract} '
-                             f'(LST001={block.is_lst001}, LST002={block.is_lst002}, LST003={block.is_lst003}) '
-                             f'- {timer() - start_time} seconds')
-
-            # SAVE ADDRESSES
-
-            for address in block.addresses:
-                # Check if address is already known and older than current data
-                data = self.db.execute(sql.select_address(), {'a': address})
-
-                if data and data[0][0] < block.number:
-                    logger.debug(f'Address {address} already present - {timer() - start_time} seconds')
-                else:
-                    self.db.execute(sql.insert_address(),
-                        {'bn': block.number, 'a': address, 'cr': block.timestamp})
-
-                    logger.debug(f'Saved address {address} - {timer() - start_time} seconds')
-
-        else:
-            logger.debug(f'Tx not valid. Additional data not saved - {timer() - start_time} seconds')
-
-        # SAVE BLOCK TO FILE
-
-        if self.cfg.get('save_blocks_to_file'):
-            self.save_block_in_file(block)
-
-            logger.debug(f'Saved block {block.number} to file - {timer() - start_time} seconds')
-
-        logger.debug(f'Processed block {block.number} in {timer() - start_time} seconds')
-
-    def insert_state(self, state: list, block: Block, start_time: timer()):
-        for kv in state:
+    def insert_state(self, block: Block, state: str = 'state'):
+        for kv in (block.state if state == 'state' else block.rewards):
             # Check if state is already known and newer than current data
             data = self.db.execute(sql.select_state(), {'k': kv['key']})
 
             if data and data[0][0] > block.number:
-                logger.debug(f'-> State {kv["key"]} already newer - {timer() - start_time} seconds')
+                logger.debug(f'-> State {kv["key"]} skipped - already newer')
                 continue
 
             self.db.execute(sql.insert_state(),
-                            {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
-                             'cr': block.timestamp, 'up': block.timestamp})
+                {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
+                'cr': block.timestamp, 'up': block.timestamp})
 
-            logger.debug(f'-> Saved state {kv} - {timer() - start_time} seconds')
+    def insert_contract(self, block: Block):
+        self.db.execute(sql.insert_contract(),
+            {'bn': block.number, 'n': block.contract, 'c': block.code,
+            'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
 
-        logger.debug(f'-> Saved state - {timer() - start_time} seconds')
+    def insert_address(self, block: Block):
+        for address in block.addresses:
+            # Check if address is already known and older than current data
+            data = self.db.execute(sql.select_address(), {'a': address})
 
-    def save_block_in_file(self, block: Block):
+            if data and data[0][0] < block.number:
+                logger.debug(f'Address {address} skipped - already newer')
+            else:
+                self.db.execute(sql.insert_address(),
+                    {'bn': block.number, 'a': address, 'cr': block.timestamp})
+
+    def save_block_to_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')
         file = os.path.join(block_dir, f'{block.number}.json')
         os.makedirs(os.path.dirname(file), exist_ok=True)
@@ -183,6 +186,7 @@ class Sync:
     def get_block(self, block_id: (int, str), check_db: bool = True) -> Block:
         """ 'block' param can either be block hash or block number """
 
+        # Check if block is already in DB
         if check_db:
             if isinstance(block_id, int):
                 # 'block_id' is Block Number
@@ -195,6 +199,13 @@ class Sync:
                 logger.debug(f'Retrieved block {block_id} from database')
                 return Block(data[0][2], source=Source.DB)
 
+        # Check for genesis block
+        if block_id == 0:
+            with open(os.path.join('res', 'genesis_block.json')) as f:
+                logger.debug(f'Retrieving genesis block from file...')
+                return Block(json.load(f), Source.WEB)
+
+        # Retrieve from web
         for source in self.cfg.get('retrieve_from'):
             host = source['host']
             wait = source['wait']
