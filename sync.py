@@ -91,6 +91,8 @@ class Sync:
                 {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
                 'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
+            logger.trace(f'-> Reward for {rw["key"]} saved')
+
     def insert_state(self, block: Block, state: str = 'state'):
         if state.lower() == 'state':
             data = block.state
@@ -127,9 +129,12 @@ class Sync:
 
             if data and data[0][0] < block.number:
                 logger.trace(f'Address {address} skipped - already newer')
-            else:
-                self.db.execute(sql.insert_address(),
-                    {'bn': block.number, 'a': address, 'cr': block.timestamp})
+                continue
+
+            self.db.execute(sql.insert_address(),
+                {'bn': block.number, 'a': address, 'cr': block.timestamp})
+
+            logger.trace(f'-> Address {address} saved')
 
     def save_block_to_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')

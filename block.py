@@ -107,13 +107,15 @@ class Block:
             else:
                 self._tx = None
                 self._tx_hash = None
-                self._state = list()
                 self._tx_is_valid = False
                 self._result = None
+                self._state = list()
                 self._addresses = set()
+
                 self._is_new_contract = False
                 self._contract = None
                 self._code = None
+
                 self._is_lst001 = False
                 self._is_lst002 = False
                 self._is_lst003 = False
