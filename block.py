@@ -26,8 +26,12 @@ class Block:
             # Block hash
             self._hash = content['hash']
 
-            # HLC timestamp
-            self._timestamp = content['hlc_timestamp'].replace('Z_0', '')
+            # Set valid timestamp for genesis block
+            if content['hlc_timestamp'] == '0000-00-00T00:00:00.000000000Z_0':
+                self._timestamp = '-infinity'
+            else:
+                # HLC timestamp
+                self._timestamp = content['hlc_timestamp'].replace('Z_0', '')
 
             # Block number
             self._number = int(content['number'])
@@ -35,69 +39,81 @@ class Block:
             # Previous block hash
             self._prev = content['previous']
 
-            # Check for genesis block
-            if int(content['number']) == 0:
-                self._state = content['genesis']
-                return
-
-            # Save transaction
-            self._tx = content['processed']
-
-            # Save transaction hash
-            self._tx_hash = content['processed']['hash']
-
-            # Check for state in transaction
-            if 'state' in content['processed']:
-                # If present, save as state
-                self._state = content['processed']['state']
-
-                # Remove state from transaction itself
-                del self._tx['state']
+            if 'rewards' in content:
+                # Distributed rewards to node owners
+                self._rewards = content['rewards']
             else:
+                self._rewards = list()
+
+            if 'processed' in content:
+                # Save transaction
+                self._tx = content['processed']
+
+                # Save transaction hash
+                self._tx_hash = content['processed']['hash']
+
+                # Check for state in transaction
+                if 'state' in content['processed']:
+                    # If present, save as state
+                    self._state = content['processed']['state']
+
+                    # Remove state from transaction itself
+                    del self._tx['state']
+                else:
+                    self._state = list()
+
+                # Transaction was valid or not
+                status = content['processed']['status']
+                self._tx_is_valid = True if status == 0 else False
+
+                # If transaction is not valid then 'result' has the error msg
+                result = content['processed']['result']
+                self._result = None if result == "None" else result
+
+                # Transaction payload
+                pld = content['processed']['transaction']['payload']
+                con = pld['contract']
+                fun = pld['function']
+
+                self._addresses = set()
+
+                # Check FROM address
+                if self._is_valid_address(pld['sender']):
+                    self._addresses.add(pld['sender'])
+                # Check TO address (if it exists)
+                if 'kwargs' in pld and 'to' in pld['kwargs']:
+                    if self._is_valid_address(pld['kwargs']['to']):
+                        self._addresses.add(pld['kwargs']['to'])
+
+                # Check if new contract was submitted
+                if con == 'submission' and fun == 'submit_contract':
+                    kwargs = pld['kwargs']
+
+                    self._is_new_contract = True
+                    self._contract = kwargs['name']
+                    self._code = kwargs['code']
+
+                    self._is_lst001 = self._con_is_lst001(kwargs['code'])
+                    self._is_lst002 = self._con_is_lst002(kwargs['code'])
+                    self._is_lst003 = self._con_is_lst003(kwargs['code'])
+                else:
+                    self._is_new_contract = False
+                    self._contract = None
+                    self._code = None
+
+                    self._is_lst001 = False
+                    self._is_lst002 = False
+                    self._is_lst003 = False
+            else:
+                self._tx = None
+                self._tx_hash = None
                 self._state = list()
-
-            # Transaction was valid or not
-            status = content['processed']['status']
-            self._tx_is_valid = True if status == 0 else False
-
-            # If transaction is not valid then 'result' has the error msg
-            result = content['processed']['result']
-            self._result = None if result == "None" else result
-
-            # Distributed rewards to node owners
-            self._rewards = content['rewards']
-
-            # Transaction payload
-            pld = content['processed']['transaction']['payload']
-            con = pld['contract']
-            fun = pld['function']
-
-            self._addresses = set()
-
-            # Check FROM address
-            if self._is_valid_address(pld['sender']):
-                self._addresses.add(pld['sender'])
-            # Check TO address (if it exists)
-            if 'kwargs' in pld and 'to' in pld['kwargs']:
-                if self._is_valid_address(pld['kwargs']['to']):
-                    self._addresses.add(pld['kwargs']['to'])
-
-            # Check if new contract was submitted
-            if con == 'submission' and fun == 'submit_contract':
-                kwargs = pld['kwargs']
-
-                self._is_new_contract = True
-                self._contract = kwargs['name']
-                self._code = kwargs['code']
-
-                self._is_lst001 = self._con_is_lst001(kwargs['code'])
-                self._is_lst002 = self._con_is_lst002(kwargs['code'])
-                self._is_lst003 = self._con_is_lst003(kwargs['code'])
-            else:
+                self._tx_is_valid = False
+                self._result = None
+                self._addresses = set()
                 self._is_new_contract = False
                 self._contract = None
                 self._code = None
-
                 self._is_lst001 = False
                 self._is_lst002 = False
                 self._is_lst003 = False
@@ -150,7 +166,7 @@ class Block:
         return self._state
 
     @property
-    def rewards(self) -> dict:
+    def rewards(self) -> list:
         return self._rewards
 
     @property
