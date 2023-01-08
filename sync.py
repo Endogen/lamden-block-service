@@ -13,7 +13,6 @@ from timeit import default_timer as timer
 from block import Block, Source, WrongBlockDataException, InvalidBlockException
 
 
-# TODO: Insert detailed TRACE log for state and addresses and rewards
 class Sync:
 
     cfg = None
@@ -91,7 +90,7 @@ class Sync:
                 {'bn': block.number, 'k': rw['key'], 'v': json.dumps(rw['value']),
                 'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
-            logger.trace(f'-> Reward for {rw["key"]} saved')
+            logger.trace(f'-> Reward {rw["key"]} saved')
 
     def insert_state(self, block: Block, state: str = 'state'):
         if state.lower() == 'state':
@@ -108,7 +107,7 @@ class Sync:
             data = self.db.execute(sql.select_state(), {'k': kv['key']})
 
             if data and data[0][0] > block.number:
-                logger.trace(f'-> State {kv["key"]} skipped - already newer')
+                logger.trace(f'-> State {kv["key"]} skipped - newer present')
                 continue
 
             self.db.execute(sql.insert_state(),
@@ -128,7 +127,7 @@ class Sync:
             data = self.db.execute(sql.select_address(), {'a': address})
 
             if data and data[0][0] < block.number:
-                logger.trace(f'Address {address} skipped - already newer')
+                logger.trace(f'Address {address} skipped - older present')
                 continue
 
             self.db.execute(sql.insert_address(),
