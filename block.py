@@ -35,8 +35,8 @@ class Block:
             # Previous block hash
             self._prev = content['previous']
 
-            # It's the genesis block
-            if self._number == 0:
+            # Check for genesis block
+            if int(content['number']) == 0:
                 self._state = content['genesis']
                 return
 
@@ -54,11 +54,11 @@ class Block:
                 # Remove state from transaction itself
                 del self._tx['state']
             else:
-                self._state = dict()
+                self._state = list()
 
             # Transaction was valid or not
             status = content['processed']['status']
-            self._is_valid = True if status == 0 else False
+            self._tx_is_valid = True if status == 0 else False
 
             # If transaction is not valid then 'result' has the error msg
             result = content['processed']['result']
@@ -66,8 +66,6 @@ class Block:
 
             # Distributed rewards to node owners
             self._rewards = content['rewards']
-            # Add rewards to state
-            self._state = self._state + self._rewards
 
             # Transaction payload
             pld = content['processed']['transaction']['payload']
@@ -88,7 +86,7 @@ class Block:
             if con == 'submission' and fun == 'submit_contract':
                 kwargs = pld['kwargs']
 
-                self._is_contract = True
+                self._is_new_contract = True
                 self._contract = kwargs['name']
                 self._code = kwargs['code']
 
@@ -96,7 +94,7 @@ class Block:
                 self._is_lst002 = self._con_is_lst002(kwargs['code'])
                 self._is_lst003 = self._con_is_lst003(kwargs['code'])
             else:
-                self._is_contract = False
+                self._is_new_contract = False
                 self._contract = None
                 self._code = None
 
@@ -140,8 +138,8 @@ class Block:
         return self._tx_hash
 
     @property
-    def is_valid(self) -> bool:
-        return self._is_valid
+    def tx_is_valid(self) -> bool:
+        return self._tx_is_valid
 
     @property
     def result(self) -> str:
@@ -156,8 +154,8 @@ class Block:
         return self._rewards
 
     @property
-    def is_contract(self) -> bool:
-        return self._is_contract
+    def is_new_contract(self) -> bool:
+        return self._is_new_contract
 
     @property
     def contract(self) -> str:
