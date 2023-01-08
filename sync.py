@@ -13,6 +13,7 @@ from timeit import default_timer as timer
 from block import Block, Source, WrongBlockDataException, InvalidBlockException
 
 
+# TODO: Insert detailed TRACE log for state and addresses and rewards
 class Sync:
 
     cfg = None
@@ -27,20 +28,18 @@ class Sync:
     def process_block(self, block: Block):
         start_time = timer()
 
-        # Check for genesis block
-        if block.number == 0:
-
-            # SAVE GENESIS BLOCK
-            self.insert_block(block)
-            # SAVE GENESIS STATE
-            self.insert_state(block)
-
-            logger.debug(f'-> Saved genesis block - {timer() - start_time} seconds')
-            return
-
         # SAVE BLOCK
         self.insert_block(block)
         logger.debug(f'-> Saved block {block.number} - {timer() - start_time} seconds')
+
+        # Check for genesis block
+        if block.number == 0:
+
+            # SAVE GENESIS STATE
+            logger.debug(f'-> Saving genesis block - this will take a while...')
+            self.insert_state(block, 'genesis')
+            logger.debug(f'-> Saved genesis block - {timer() - start_time} seconds')
+            return
 
         # SAVE TRANSACTION
         self.insert_tx(block)
@@ -48,7 +47,7 @@ class Sync:
 
         # SAVE REWARDS
         self.insert_rewards(block)
-        logger.debug(f'-> Saved rewards {block.rewards} - {timer() - start_time} seconds')
+        logger.debug(f'-> Saved rewards - {timer() - start_time} seconds')
 
         # SAVE REWARDS STATE
         self.insert_state(block, 'rewards')
@@ -93,17 +92,28 @@ class Sync:
                 'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
     def insert_state(self, block: Block, state: str = 'state'):
-        for kv in (block.state if state == 'state' else block.rewards):
+        if state.lower() == 'state':
+            data = block.state
+        elif state.lower() == 'rewards':
+            data = block.rewards
+        elif state.lower() == 'genesis':
+            data = block.content['genesis']
+        else:
+            data = dict()
+
+        for kv in data:
             # Check if state is already known and newer than current data
             data = self.db.execute(sql.select_state(), {'k': kv['key']})
 
             if data and data[0][0] > block.number:
-                logger.debug(f'-> State {kv["key"]} skipped - already newer')
+                logger.trace(f'-> State {kv["key"]} skipped - already newer')
                 continue
 
             self.db.execute(sql.insert_state(),
                 {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
                 'cr': block.timestamp, 'up': block.timestamp})
+
+            logger.trace(f'-> State {kv["key"]} saved')
 
     def insert_contract(self, block: Block):
         self.db.execute(sql.insert_contract(),
@@ -116,7 +126,7 @@ class Sync:
             data = self.db.execute(sql.select_address(), {'a': address})
 
             if data and data[0][0] < block.number:
-                logger.debug(f'Address {address} skipped - already newer')
+                logger.trace(f'Address {address} skipped - already newer')
             else:
                 self.db.execute(sql.insert_address(),
                     {'bn': block.number, 'a': address, 'cr': block.timestamp})
@@ -199,12 +209,6 @@ class Sync:
                 logger.debug(f'Retrieved block {block_id} from database')
                 return Block(data[0][2], source=Source.DB)
 
-        # Check for genesis block
-        if block_id == 0:
-            with open(os.path.join('res', 'genesis_block.json')) as f:
-                logger.debug(f'Retrieving genesis block from file...')
-                return Block(json.load(f), Source.WEB)
-
         # Retrieve from web
         for source in self.cfg.get('retrieve_from'):
             host = source['host']
@@ -220,9 +224,19 @@ class Sync:
 
             try:
 
+                # Get block from web
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
-                    return Block(data.json(), source=Source.WEB)
+                    block = Block(data.json(), source=Source.WEB)
+
+                # Check for genesis block
+                if block.number == 0:
+                    # Get block from file
+                    logger.debug(f'Retrieving genesis block from file')
+                    with open(os.path.join('res', 'genesis_block.json')) as f:
+                        block = Block(json.load(f), Source.WEB)
+
+                return block
 
             except InvalidBlockException as e:
                 msg = f'Block {block_id} - invalid: {e}'
