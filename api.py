@@ -37,9 +37,13 @@ app.add_middleware(
     allow_credentials=True
 )
 
-bot = TelegramBot(Config('cfg', 'tgbot.json'))
-db = DB(Config('cfg', 'db.json'))
 cfg = Config('cfg', 'api.json')
+
+tg_cfg = Config('cfg', 'tgbot.json')
+bot = TelegramBot(tg_cfg)
+
+db_cfg = Config('cfg', 'db.json')
+db = DB(db_cfg)
 
 logger.remove()
 
@@ -48,7 +52,7 @@ logger.add(
     level=cfg.get('log_level'))
 
 logger.add(
-    os.path.join('log', 'api_{time}.log'),
+    Path('log', 'api_{time}.log'),
     retention=timedelta(days=cfg.get('log_retention')),
     format='{time} {level} {name} {message}',
     level=cfg.get('log_level'),
@@ -56,7 +60,6 @@ logger.add(
     diagnose=True)
 
 
-# TOOD: Why is the favicon not showing?
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon():
     return FileResponse(Path('res', 'favicon.ico'))
@@ -73,15 +76,16 @@ def db_size():
     start = timer()
 
     try:
-        logger.debug(f'API ENTRY: db_size()')
-        result = db.execute(sql.select_db_size(), {'n': cfg.get('db_name')})
-        logger.debug(f'API RESULT after {timer() - start:.4f} seconds: {result}')
 
-        return result[0][1]
+        logger.debug(f'API --> db_size()')
+        result = db.execute(sql.select_db_size(), {'n': db_cfg.get('db_name')})
+        logger.debug(f'API <-- after {timer() - start:.4f} seconds: {result}')
+
+        return result[0][0]
 
     except Exception as e:
-        bot.send(str(e))
-        return {'error': str(e)}
+        bot.send(repr(e))
+        return {'error': repr(e)}
 
 
 @app.get("/holders/{contract}")
