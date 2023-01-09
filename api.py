@@ -1,4 +1,3 @@
-import os
 import sys
 import uvicorn
 import sql
@@ -26,6 +25,7 @@ from tgbot import TelegramBot
 # TODO: API for which contract holds which funds
 # TODO: https://stackoverflow.com/questions/1237725/copying-postgresql-database-to-another-server
 # TODO: https://github.com/ultrajson/ultrajson
+# TODO: Total rewards for address
 
 app = FastAPI(title='LAPI')
 
