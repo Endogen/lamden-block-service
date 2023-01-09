@@ -30,7 +30,7 @@ class Sync:
 
         # SAVE BLOCK
         self.insert_block(block)
-        logger.debug(f'-> Saved block {block.number} - {timer() - start_time} seconds')
+        logger.debug(f'-> Saved block {block.number} - {timer() - start_time:.4f} seconds')
 
         # Check for genesis block
         if block.number == 0:
@@ -38,44 +38,44 @@ class Sync:
             # SAVE GENESIS STATE
             logger.debug(f'-> Saving genesis block - this will take a while...')
             self.insert_state(block, 'genesis')
-            logger.debug(f'-> Saved genesis block - {timer() - start_time} seconds')
+            logger.debug(f'-> Saved genesis block - {timer() - start_time:.4f} seconds')
             return
 
         # SAVE TRANSACTION
         self.insert_tx(block)
-        logger.debug(f'-> Saved tx {block.tx_hash} - {timer() - start_time} seconds')
+        logger.debug(f'-> Saved tx {block.tx_hash} - {timer() - start_time:.4f} seconds')
 
         # SAVE REWARDS
         self.insert_rewards(block)
-        logger.debug(f'-> Saved rewards - {timer() - start_time} seconds')
+        logger.debug(f'-> Saved rewards - {timer() - start_time:.4f} seconds')
 
         # SAVE REWARDS STATE
         self.insert_state(block, 'rewards')
-        logger.debug(f'-> Saved rewards state - {timer() - start_time} seconds')
+        logger.debug(f'-> Saved rewards state - {timer() - start_time:.4f} seconds')
 
         if block.tx_is_valid:
 
             # SAVE STATE
             self.insert_state(block)
-            logger.debug(f'-> Saved state - {timer() - start_time} seconds')
+            logger.debug(f'-> Saved state - {timer() - start_time:.4f} seconds')
 
             # SAVE ADDRESSES
             self.insert_address(block)
-            logger.debug(f'-> Saved addresses - {timer() - start_time} seconds')
+            logger.debug(f'-> Saved addresses - {timer() - start_time:.4f} seconds')
 
             if block.is_new_contract:
 
                 # SAVE CONTRACT
                 self.insert_contract(block)
-                logger.debug(f'-> Saved contract {block.contract} - {timer() - start_time} seconds')
+                logger.debug(f'-> Saved contract {block.contract} - {timer() - start_time:.4f} seconds')
 
         if self.cfg.get('save_blocks_to_file'):
 
             # SAVE BLOCK TO FILE
             self.save_block_to_file(block)
-            logger.debug(f'-> Saved block {block.number} to file - {timer() - start_time} seconds')
+            logger.debug(f'-> Saved block {block.number} to file - {timer() - start_time:.4f} seconds')
 
-        logger.debug(f'Finished processing block {block.number} - {timer() - start_time} seconds')
+        logger.debug(f'Finished processing block {block.number} - {timer() - start_time:.4f} seconds')
 
     def insert_block(self, block: Block):
         self.db.execute(sql.insert_block(),
@@ -196,7 +196,7 @@ class Sync:
             # Set sync start to previous block number
             self.cfg.set('sync_start', block.number)
 
-        logger.debug(f'Sync job --> Ended after {timer() - start_time} seconds')
+        logger.debug(f'Sync job --> Ended after {timer() - start_time:.4f} seconds')
 
     def get_block(self, block_id: (int, str), check_db: bool = True) -> Block:
         """ 'block' param can either be block hash or block number """
