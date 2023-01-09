@@ -4,11 +4,14 @@ import typer
 
 from typing import List
 from loguru import logger
+
+from block import Source
 from sync import Sync
 from config import Config
 from database import DB
 from datetime import timedelta
 from tgbot import TelegramBot
+from timeit import default_timer as timer
 
 # TODO: Check if all blocks are in DB
 # TODO: Check if all blocks on HDD
@@ -38,29 +41,29 @@ sync = Sync(Config(os.path.join('cfg', 'sync.json')), db, tgb)
 
 @app.command()
 def sync_blocks(block_nums: List[int]):
-    for block_num in block_nums:
-        state, block = sync.get_block(block_num)
+    start_time = timer()
 
-        if state == State.OK:
-            sync.process_block(block)
+    try:
+        for block_num in block_nums:
+            block = sync.get_block(block_num)
+
+            if block.source == Source.WEB:
+                sync.process_block(block)
+    except Exception as e:
+        logger.exception(e)
+        return
+
+    logger.debug(f'Synced in {timer() - start_time} seconds')
 
 
 @app.command()
-def sync_block_range(from_block_num: int, to_block_num: int):
-    for block_num in range(from_block_num, to_block_num + 1):
-        state, block = sync.get_block(block_num)
-
-        if state == State.OK:
-            sync.process_block(block)
+def sync_block_range(from_block_num: int, to_block_num: int, check_db: bool = True):
+    sync.sync(start=from_block_num, end=to_block_num, check_db=check_db)
 
 
 @app.command()
-def sync_blocks_from(start_block_num: int):
-    for block_num in range(start_block_num, sync.cfg.get('block_latest') + 1):
-        state, block = sync.get_block(block_num)
-
-        if state == State.OK:
-            sync.process_block(block)
+def sync_blocks_from(from_block_num: int, check_db: bool = True):
+    sync.sync(start=from_block_num, end=0, check_db=check_db)
 
 
 app()
