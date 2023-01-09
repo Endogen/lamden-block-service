@@ -5,6 +5,7 @@ import time
 
 import requests as r
 
+from pathlib import Path
 from config import Config
 from database import DB
 from loguru import logger
@@ -137,7 +138,7 @@ class Sync:
 
     def save_block_to_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')
-        file = os.path.join(block_dir, f'{block.number}.json')
+        file = Path(block_dir, f'{block.number}.json')
         os.makedirs(os.path.dirname(file), exist_ok=True)
 
         with open(file, 'w', encoding='utf-8') as f:
@@ -237,7 +238,7 @@ class Sync:
                 if block.number == 0:
                     # Get block from file
                     logger.debug(f'Retrieving genesis block from file')
-                    with open(os.path.join('res', 'genesis_block.json')) as f:
+                    with open(Path('res', 'genesis_block.json')) as f:
                         block = Block(json.load(f), Source.WEB)
 
                 return block
