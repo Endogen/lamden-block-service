@@ -90,7 +90,7 @@ def select_holders(contract: str, addresses: bool = True, contracts: bool = True
     return f"SELECT state.clean, state.val " \
            f"FROM (SELECT REPLACE(key, '{contract}.balances:', '') AS clean, " \
            f"(CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) AS val " \
-           f"FROM current_state WHERE key LIKE '{contract}.balances:%') AS state " \
+           f"FROM state WHERE key LIKE '{contract}.balances:%') AS state " \
            f"WHERE state.clean NOT LIKE '%:%' AND state.val::decimal != '0.0' {add_con} " \
            f"ORDER BY state.val DESC " \
            f"{top}"
@@ -126,12 +126,13 @@ def select_address():
 def select_contract():
     return """
     SELECT json_build_object(
+      'block_num', 'c.block_num,
       'name', c.name,
-      'tx_hash', c.tx_hash,
       'lst001', c.lst001,
       'lst002', c.lst002,
       'lst003', c.lst003,
-      'code', c.code
+      'code', c.code,
+      'created', c.created
     )
     FROM contracts c
     WHERE name = %(c)s

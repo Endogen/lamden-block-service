@@ -79,7 +79,7 @@ def db_size():
 
         logger.debug(f'API --> db_size()')
         result = db.execute(sql.select_db_size(), {'n': db_cfg.get('db_name')})
-        logger.debug(f'API <-- after {timer() - start:.4f} seconds: {result}')
+        logger.debug(f'API <-- after {timer() - start:.4f} seconds')
 
         return result[0][0]
 
@@ -93,27 +93,29 @@ def holders(contract: str, addresses: bool = True, contracts: bool = True, limit
     start = timer()
 
     try:
-        logger.debug(f'API ENTRY: holders({contract}, {addresses}, {contracts}, {limit})')
+
+        logger.debug(f'API --> holders({contract}, {addresses}, {contracts}, {limit})')
         result = db.execute_raw(sql.select_holders(contract, addresses, contracts, limit))
-        logger.debug(f'API RESULT after {timer() - start:.4f} seconds: {result}')
+        logger.debug(f'API <-- after {timer() - start:.4f} seconds')
 
         return result
 
     except Exception as e:
-        bot.send(str(e))
-        return {'error': str(e)}
+        bot.send(repr(e))
+        return {'error': repr(e)}
 
 
 @app.get("/balance/{address}")
 def balance(address: str, contract: str = None):
     start = timer()
 
-    logger.debug(f'API ENTRY: balance({address}, {contract})')
-
     try:
+
+        logger.debug(f'API --> balance({address}, {contract})')
+
         if contract:
             result = db.execute_raw(sql.select_balance(address, contract))
-            logger.debug(f'API RESULT after: {timer() - start:.4f} seconds: {result}')
+            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
 
             if result and result[0] and result[0][0]:
                 return float(result[0][0])
@@ -122,44 +124,67 @@ def balance(address: str, contract: str = None):
 
         else:
             result = db.execute_raw(sql.select_balances(address))
-            logger.debug(f'API RESULT after: {timer() - start:.4f} seconds: {result}')
+            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
 
             return result
 
     except Exception as e:
-        bot.send(str(e))
-        return {'error': str(e)}
+        bot.send(repr(e))
+        return {'error': repr(e)}
 
 
 @app.get("/state")
 def state(contract: str = None):
-    logger.debug(f'API ENTRY: state({contract})')
+    start = timer()
 
-    if contract:
-        result = db.execute(sql.select_contract(), {'c': contract})
-        logger.debug(f'API RESULT: {result}')
-        # TODO
+    try:
 
-    else:
-        result = db.execute(sql.select_state())  # TODO
-        logger.debug(f'API RESULT: {result}')
+        logger.debug(f'API --> state({contract})')
 
+        if contract:
+            result = db.execute(sql.select_contract(), {'c': contract})
+            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+            # TODO
+
+        else:
+            result = db.execute(sql.select_state())  # TODO
+            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
 
 @app.get("/contract/{contract}")
 def contract(contract: str):
-    logger.debug(f'API ENTRY: contract({contract})')
-    result = db.execute('contract_select', {'c': contract})
-    logger.debug(f'API RESULT: {result}')
-    return result[0][0]
+    start = timer()
+
+    try:
+
+        logger.debug(f'API --> contract({contract})')
+        result = db.execute('contract_select', {'c': contract})  # TODO
+        logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+        return result[0][0]
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
 
 
 # TODO: Rework - params not integrated yet
 @app.get("/contracts")
 def contracts(name: str = None, lst001: bool = False, lst002: bool = False, lst003: bool = False):
-    logger.debug(f'API ENTRY: contracts({contract}, {lst001}, {lst002}, {lst003})')
-    result = db.execute(sql.select_contracts(), {'n': name})
-    logger.debug(f'API RESULT: {result}')
-    return result
+    start = timer()
+
+    try:
+
+        logger.debug(f'API --> contracts({name}, {lst001}, {lst002}, {lst003})')
+        result = db.execute(sql.select_contracts(), {'n': name})
+        logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+        return result
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
 
 
 uvicorn.run(app, host=cfg.get('host'), port=cfg.get('port'))
