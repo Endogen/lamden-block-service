@@ -95,7 +95,7 @@ def holders(contract: str, addresses: bool = True, contracts: bool = True, limit
     try:
 
         logger.debug(f'API --> holders({contract}, {addresses}, {contracts}, {limit})')
-        result = db.execute(sql.select_holders(addresses, contracts, limit), {'c': contract})
+        result = db.execute_raw(sql.select_holders(contract, addresses, contracts, limit))
         logger.debug(f'API <-- after {timer() - start:.4f} seconds')
 
         return result
@@ -114,7 +114,7 @@ def balance(address: str, contract: str = None):
         logger.debug(f'API --> balance({address}, {contract})')
 
         if contract:
-            result = db.execute(sql.select_balance(), {'a': address, 'c': contract})
+            result = db.execute_raw(sql.select_balance(address, contract))
             logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
 
             if result and result[0] and result[0][0]:
@@ -123,7 +123,7 @@ def balance(address: str, contract: str = None):
                 return 0
 
         else:
-            result = db.execute(sql.select_balances(), {'a': address})
+            result = db.execute_raw(sql.select_balances(address))
             logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
 
             return result

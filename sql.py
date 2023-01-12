@@ -75,35 +75,39 @@ def select_db_size():
     """
 
 
-def select_holders(addresses: bool = True, contracts: bool = True, limit: int = 0):
-    con = top = ''
+# TODO: Rework to use params like all other statements
+def select_holders(contract: str, addresses: bool = True, contracts: bool = True, limit: int = 0):
+    add_con = top = ''
 
     if addresses and not contracts:
-        con = "AND state.clean NOT LIKE 'con_%'"
+        add_con = "AND state.clean NOT LIKE 'con_%'"
     if contracts and not addresses:
-        con = "AND state.clean LIKE 'con_%'"
+        add_con = "AND state.clean LIKE 'con_%'"
+
     if limit != 0:
         top = f"LIMIT {limit}"
 
     return f"SELECT state.clean, state.val " \
-           f"FROM (SELECT REPLACE(key, '%(c)s.balances:', '') AS clean, " \
+           f"FROM (SELECT REPLACE(key, '{contract}.balances:', '') AS clean, " \
            f"(CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) AS val " \
-           f"FROM state WHERE key LIKE '%(c)s.balances:%') AS state " \
-           f"WHERE state.clean NOT LIKE '%:%' AND state.val::decimal != '0.0' {con} " \
+           f"FROM state WHERE key LIKE '{contract}.balances:%') AS state " \
+           f"WHERE state.clean NOT LIKE '%:%' AND state.val::decimal != '0.0' {add_con} " \
            f"ORDER BY state.val DESC " \
            f"{top}"
 
 
-def select_balance():
+# TODO: Rework to use params like all other statements
+def select_balance(address: str, contract: str = None):
     return f"SELECT (CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) " \
-           f"FROM state WHERE key LIKE '%(c)s.balances:%(a)s'"
+           f"FROM state WHERE key LIKE '{contract}.balances:{address}'"
 
 
-def select_balances():
+# TODO: Rework to use params like all other statements
+def select_balances(address: str):
     return f"SELECT substring(key from 0 for position('.' in key)), " \
            f"(CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END) " \
            f"FROM state " \
-           f"WHERE key LIKE '%balances:%(a)s' AND (value->>'__fixed__')::decimal != 0" \
+           f"WHERE key LIKE '%balances:{address}' AND (value->>'__fixed__')::decimal != 0" \
            f"ORDER BY key"
 
 
