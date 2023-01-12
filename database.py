@@ -58,23 +58,3 @@ class DB:
         finally:
             if cur: cur.close()
             if con: con.close()
-
-    # TODO: Really needed?
-    def execute_raw(self, query: str):
-        con = cur = None
-
-        try:
-            con = self._connect()
-            cur = con.cursor()
-
-            cur.execute(query)
-
-            return cur.fetchall()
-
-        except Exception as e:
-            if 'no results to fetch' not in str(e):
-                logger.exception(f'Error while executing SQL: {e}')
-
-        finally:
-            if cur: cur.close()
-            if con: con.close()
