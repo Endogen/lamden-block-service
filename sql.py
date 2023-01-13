@@ -126,7 +126,7 @@ def select_address():
 def select_contract():
     return """
     SELECT json_build_object(
-      'block_num', 'c.block_num,
+      'block_num', c.block_num,
       'name', c.name,
       'lst001', c.lst001,
       'lst002', c.lst002,
@@ -154,8 +154,52 @@ def select_contracts():
     """
 
 
-def select_state():
-    return "SELECT * FROM state WHERE key LIKE %(k)s"
+def select_raw_state():
+    return """
+    SELECT json_build_object(
+      'block_num', s.block_num,
+      'key', s.key,
+      'value', s.value,
+      'updated', s.updated,
+      'created', s.created
+    )
+    FROM state s
+    WHERE key = %(k)s
+    """
+
+
+def select_raw_states(partial_key: str = None):
+    return f"""
+    SELECT json_build_object(
+      'block_num', s.block_num,
+      'key', s.key,
+      'value', s.value,
+      'updated', s.updated,
+      'created', s.created
+    )
+    FROM state s
+    WHERE key LIKE '{partial_key}%'
+    """
+
+
+def select_state(clean: bool = False):
+    if clean:
+        return """
+        SELECT (CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END)
+        FROM state WHERE key = %(k)s
+        """
+    else:
+        return "SELECT value FROM state WHERE key = %(k)s"
+
+
+def select_states(partial_key: str = None, clean: bool = False):
+    if clean:
+        return f"""
+        SELECT key, (CASE WHEN value ? '__fixed__' THEN (value->>'__fixed__')::jsonb ELSE value END)
+        FROM state WHERE key LIKE '{partial_key}%'
+        """
+    else:
+        return f"SELECT key, value FROM state WHERE key LIKE {partial_key}%"
 
 
 def insert_block():

@@ -26,6 +26,7 @@ from tgbot import TelegramBot
 # TODO: https://stackoverflow.com/questions/1237725/copying-postgresql-database-to-another-server
 # TODO: https://github.com/ultrajson/ultrajson
 # TODO: Total rewards for address
+# TODO: Use Starlite instead of FastAPI? https://github.com/starlite-api/starlite
 
 app = FastAPI(title='LAPI')
 
@@ -79,7 +80,7 @@ def db_size():
 
         logger.debug(f'API --> db_size()')
         result = db.execute(sql.select_db_size(), {'n': db_cfg.get('db_name')})
-        logger.debug(f'API <-- after {timer() - start:.4f} seconds')
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
 
         return result[0][0]
 
@@ -89,14 +90,14 @@ def db_size():
 
 
 @app.get("/holders/{contract}")
-def holders(contract: str, addresses: bool = True, contracts: bool = True, limit: int = 0):
+def get_holders(contract: str, addresses: bool = True, contracts: bool = True, limit: int = 0):
     start = timer()
 
     try:
 
-        logger.debug(f'API --> holders({contract}, {addresses}, {contracts}, {limit})')
+        logger.debug(f'API --> get_holders({contract}, {addresses}, {contracts}, {limit})')
         result = db.execute(sql.select_holders(contract, addresses, contracts, limit))
-        logger.debug(f'API <-- after {timer() - start:.4f} seconds')
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
 
         return result
 
@@ -106,16 +107,16 @@ def holders(contract: str, addresses: bool = True, contracts: bool = True, limit
 
 
 @app.get("/balance/{address}")
-def balance(address: str, contract: str = None):
+def get_balance(address: str, contract: str = None):
     start = timer()
 
     try:
 
-        logger.debug(f'API --> balance({address}, {contract})')
+        logger.debug(f'API --> get_balance({address}, {contract})')
 
         if contract:
             result = db.execute(sql.select_balance(address, contract))
-            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+            logger.debug(f'API <-- after {timer() - start:.3f} seconds')
 
             if result and result[0] and result[0][0]:
                 return float(result[0][0])
@@ -124,7 +125,7 @@ def balance(address: str, contract: str = None):
 
         else:
             result = db.execute(sql.select_balances(address))
-            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+            logger.debug(f'API <-- after {timer() - start:.3f} seconds')
 
             return result
 
@@ -133,37 +134,16 @@ def balance(address: str, contract: str = None):
         return {'error': repr(e)}
 
 
-@app.get("/state")
-def state(contract: str = None):
+@app.get("/raw_state/{key}")
+def get_raw_state(key: str = None):
     start = timer()
 
     try:
 
-        logger.debug(f'API --> state({contract})')
+        logger.debug(f'API --> get_raw_state({key})')
+        result = db.execute(sql.select_raw_state(), {'k': key})
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
 
-        if contract:
-            result = db.execute(sql.select_contract(), {'c': contract})
-            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
-            # TODO
-
-        else:
-            result = db.execute(sql.select_state())  # TODO
-            logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
-
-    except Exception as e:
-        bot.send(repr(e))
-        return {'error': repr(e)}
-
-
-@app.get("/contract/{contract}")
-def contract(contract: str):
-    start = timer()
-
-    try:
-
-        logger.debug(f'API --> contract({contract})')
-        result = db.execute('contract_select', {'c': contract})
-        logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
         return result[0][0]
 
     except Exception as e:
@@ -171,16 +151,84 @@ def contract(contract: str):
         return {'error': repr(e)}
 
 
-# TODO: Rework - params not integrated yet
-@app.get("/contracts")
-def contracts(name: str = None, lst001: bool = False, lst002: bool = False, lst003: bool = False):
+@app.get("/raw_states/{key}")
+def get_raw_states(key: str = None):
     start = timer()
 
     try:
 
-        logger.debug(f'API --> contracts({name}, {lst001}, {lst002}, {lst003})')
+        logger.debug(f'API --> get_raw_states({key})')
+        result = db.execute(sql.select_raw_states(key))
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
+
+        return result
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
+
+
+@app.get("/state/{key}")
+def get_state(key: str = None):
+    start = timer()
+
+    try:
+
+        logger.debug(f'API --> get_state({key})')
+        result = db.execute(sql.select_state(clean=True), {'k': key})
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
+
+        return result[0][0]
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
+
+
+@app.get("/states/{key}")
+def get_states(key: str = None):
+    start = timer()
+
+    try:
+
+        logger.debug(f'API --> get_states({key})')
+        result = db.execute(sql.select_states(key, clean=True))
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
+
+        return result
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
+
+
+@app.get("/contract/{contract}")
+def get_contract(contract: str):
+    start = timer()
+
+    try:
+
+        logger.debug(f'API --> get_contract({contract})')
+        result = db.execute(sql.select_contract(), {'c': contract})
+        logger.debug(f'API <-- after {timer() - start:.3f} seconds')
+
+        return result[0][0]
+
+    except Exception as e:
+        bot.send(repr(e))
+        return {'error': repr(e)}
+
+
+# TODO: Make sure it works
+@app.get("/contracts")
+def get_contracts(name: str = None, lst001: bool = False, lst002: bool = False, lst003: bool = False):
+    start = timer()
+
+    try:
+
+        logger.debug(f'API --> get_contracts({name}, {lst001}, {lst002}, {lst003})')
         result = db.execute(sql.select_contracts(), {'n': name})
-        logger.debug(f'API <-- after: {timer() - start:.4f} seconds')
+        logger.debug(f'API <-- after: {timer() - start:.3f} seconds')
         return result
 
     except Exception as e:
