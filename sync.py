@@ -107,7 +107,7 @@ class Sync:
             # Check if state is already known and newer than current data
             data = self.db.execute(sql.select_raw_state(), {'k': kv['key']})
 
-            if data and data[0][0] and data[0][0]['block_num'] > block.number:
+            if data and data[0] and data[0][0] and data[0][0]['block_num'] > block.number:
                 logger.trace(f'-> State {kv["key"]} skipped - newer present')
                 continue
 
