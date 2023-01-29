@@ -78,11 +78,11 @@ class Block:
                 self._addresses = set()
 
                 # Check FROM address
-                if self._is_valid_address(pld['sender']):
+                if self.is_valid_address(pld['sender']):
                     self._addresses.add(pld['sender'])
                 # Check TO address (if it exists)
                 if 'kwargs' in pld and 'to' in pld['kwargs']:
-                    if self._is_valid_address(pld['kwargs']['to']):
+                    if self.is_valid_address(pld['kwargs']['to']):
                         self._addresses.add(pld['kwargs']['to'])
 
                 # Check if new contract was submitted
@@ -93,9 +93,9 @@ class Block:
                     self._contract = kwargs['name']
                     self._code = kwargs['code']
 
-                    self._is_lst001 = self._con_is_lst001(kwargs['code'])
-                    self._is_lst002 = self._con_is_lst002(kwargs['code'])
-                    self._is_lst003 = self._con_is_lst003(kwargs['code'])
+                    self._is_lst001 = self.con_is_lst001(kwargs['code'])
+                    self._is_lst002 = self.con_is_lst002(kwargs['code'])
+                    self._is_lst003 = self.con_is_lst003(kwargs['code'])
                 else:
                     self._is_new_contract = False
                     self._contract = None
@@ -199,7 +199,8 @@ class Block:
     def addresses(self) -> list:
         return list(self._addresses)
 
-    def _con_is_lst001(self, code: str) -> bool:
+    @staticmethod
+    def con_is_lst001(code: str) -> bool:
         code = code.replace(' ', '')
 
         if 'balances=Hash(' not in code:
@@ -213,7 +214,8 @@ class Block:
 
         return True
 
-    def _con_is_lst002(self, code: str) -> bool:
+    @staticmethod
+    def con_is_lst002(code: str) -> bool:
         code = code.replace(' ', '')
 
         if 'metadata=Hash(' not in code:
@@ -221,7 +223,8 @@ class Block:
 
         return True
 
-    def _con_is_lst003(self, code: str) -> bool:
+    @staticmethod
+    def con_is_lst003(code: str) -> bool:
         code = code.replace(' ', '')
 
         if 'collection_name=Variable()' not in code:
@@ -245,7 +248,8 @@ class Block:
 
         return True
 
-    def _is_valid_address(self, address: str) -> bool:
+    @staticmethod
+    def is_valid_address(address: str) -> bool:
         if not address:
             return False
         if not len(address) == 64:
