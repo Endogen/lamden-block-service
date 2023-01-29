@@ -25,6 +25,11 @@ class Sync:
         self.db = database
         self.tgb = tgbot
 
+    def process_genesis_block(self, block: Block):
+        start_time = timer()
+
+
+
     def process_block(self, block: Block):
         start_time = timer()
 
@@ -203,12 +208,12 @@ class Sync:
 
         # Check if block is already in DB
         if check_db:
-            if isinstance(block_id, int):
-                # 'block_id' is Block Number
-                data = self.db.execute(sql.select_block_by_num(), {'bn': block_id})
-            else:
+            if len(block_id) == 64:
                 # 'block_id' is Block Hash
                 data = self.db.execute(sql.select_block_by_hash(), {'bh': block_id})
+            else:
+                # 'block_id' is Block Number
+                data = self.db.execute(sql.select_block_by_num(), {'bn': block_id})
 
             if data:
                 logger.debug(f'Retrieved block {block_id} from database')
