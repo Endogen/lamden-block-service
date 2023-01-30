@@ -1,6 +1,8 @@
 {
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-v2",
     "block_latest": null,
+    "genesis_block_dir": "res/genesis",
+    "genesis_synced": false,
     "job_interval_sync": 10,
     "log_level": "INFO",
     "log_retention": 3,

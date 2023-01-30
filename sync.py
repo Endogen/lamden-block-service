@@ -1,4 +1,3 @@
-import os
 import sql
 import json
 import time
@@ -25,26 +24,77 @@ class Sync:
         self.db = database
         self.tgb = tgbot
 
-    def process_genesis_block(self, block: Block):
+    def process_genesis_block(self):
         start_time = timer()
 
+        genesis_block_dir = self.cfg.get('genesis_block_dir')
 
+        # Check if state changes files exist
+        state_changes_list = Path(genesis_block_dir).glob('**/state_changes*.json')
 
+        genesis_block_state = list()
+
+        # Merge state into one list
+        for path in state_changes_list:
+            with open(Path(path)) as f:
+                genesis_block_state += json.load(f)
+
+        genesis_block = Path(genesis_block_dir, 'genesis_block.json')
+
+        # Check if genesis block file exists
+        if not genesis_block.is_file():
+            logger.error(f'File does not exist: {genesis_block}')
+            return
+
+        # Load content of block 0
+        with open(Path(genesis_block)) as f:
+            block = json.load(f)
+
+        # Set state in block
+        block['genesis'] = genesis_block_state
+        block = Block(block, Source.WEB)
+
+        # Save genesis state in database
+        logger.debug(f'-> Saving genesis block...')
+
+        # TODO
+        self.db.execute(sql.insert_state(),
+                        {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
+                         'cr': block.timestamp, 'up': block.timestamp})
+
+        logger.debug(f'-> Saved genesis block - {timer() - start_time:.3f} seconds')
+
+        state = dict()
+
+        # Create proper dict from state
+        for entry in block['genesis']:
+            state[entry['key']] = entry['value']
+
+        logger.debug(f'-> Saving genesis block contracts...')
+
+        # Identify contracts
+        for key, value in state.items():
+            if key.endswith('.__code__'):
+                contract_code = value
+                contract_name = key[:key.index('.__code__')]
+                submitted = contract_name + '.__submitted__'
+                contract_submitted = state[submitted]
+
+                # TODO
+                self.db.execute(sql.insert_contract(),
+                    {'bn': block.number, 'n': block.contract, 'c': block.code,
+                    'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
+
+        logger.debug(f'-> Saved genesis block contracts - {timer() - start_time:.3f} seconds')
+        logger.debug(f'Finished processing genesis block - {timer() - start_time:.3f} seconds')
+
+    # TODO: Make sure that block 0 can run through this
     def process_block(self, block: Block):
         start_time = timer()
 
         # SAVE BLOCK
         self.insert_block(block)
         logger.debug(f'-> Saved block {block.number} - {timer() - start_time:.3f} seconds')
-
-        # Check for genesis block
-        if block.number == 0:
-
-            # SAVE GENESIS STATE
-            logger.debug(f'-> Saving genesis block - this will take a while...')
-            self.insert_state(block, 'genesis')
-            logger.debug(f'-> Saved genesis block - {timer() - start_time:.3f} seconds')
-            return
 
         # SAVE TRANSACTION
         self.insert_tx(block)
@@ -103,8 +153,6 @@ class Sync:
             data = block.state
         elif state.lower() == 'rewards':
             data = block.rewards
-        elif state.lower() == 'genesis':
-            data = block.content['genesis']
         else:
             data = dict()
 
@@ -143,16 +191,21 @@ class Sync:
 
     def save_block_to_file(self, block: Block):
         block_dir = self.cfg.get('block_dir')
-        file = Path(block_dir, f'{block.number}.json')
-        os.makedirs(os.path.dirname(file), exist_ok=True)
+        Path(block_dir).mkdir(parents=True, exist_ok=True)
+        block_file = Path(block_dir, f'{block.number}.json')
 
-        with open(file, 'w', encoding='utf-8') as f:
+        with open(block_file, 'w', encoding='utf-8') as f:
             json.dump(block.content, f, sort_keys=True, indent=4)
 
     def sync(self, start: int = None, end: int = None, check_db: bool = True):
         start_time = timer()
 
         logger.debug(f'Sync job --> Started...')
+
+        # If not done yet, sync genesis block
+        if not self.cfg.get('genesis_synced'):
+            self.process_genesis_block()
+            self.cfg.set('genesis_synced', True)
 
         # Block number to start syncing from
         sync_start = start if start else self.cfg.get('sync_start')
@@ -238,13 +291,6 @@ class Sync:
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
                     block = Block(data.json(), source=Source.WEB)
-
-                # Check for genesis block
-                if block.number == 0:
-                    # Get block from file
-                    logger.debug(f'Retrieving genesis block from file')
-                    with open(Path('res', 'genesis_block.json')) as f:
-                        block = Block(json.load(f), Source.WEB)
 
                 return block
 

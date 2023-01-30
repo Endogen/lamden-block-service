@@ -141,4 +141,5 @@ cython_debug/
 # Custom
 .idea
 log/
+res/genesis/
 stop
