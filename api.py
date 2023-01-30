@@ -27,6 +27,7 @@ from tgbot import TelegramBot
 # TODO: https://github.com/ultrajson/ultrajson
 # TODO: Total rewards for address
 # TODO: Use Starlite instead of FastAPI? https://github.com/starlite-api/starlite
+# TODO: Return everything for a contract - state, code, general data, ...
 
 app = FastAPI(title='LAPI')
 
