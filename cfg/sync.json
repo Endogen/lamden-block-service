@@ -1,6 +1,6 @@
 {
     "block_dir": "/Users/endogen/Projekte/lamden-blocks-v2",
-    "block_latest": 1673830766589455872,
+    "block_latest": null,
     "genesis_block_dir": "res/genesis",
     "genesis_synced": false,
     "job_interval_sync": 10,
@@ -33,7 +33,7 @@
         }
     ],
     "save_blocks_to_file": true,
-    "sync_end": 1673830766589455872,
+    "sync_end": null,
     "sync_start": null,
     "telegram_notify": 134166731,
     "ws_masternode": "wss://testnet-v2-master-lon.lamden.io",
