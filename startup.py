@@ -7,7 +7,7 @@ import json
 import websocket
 import utils
 
-from block import Block, Source
+from block import Block, State
 from tgbot import TelegramBot
 from sync import Sync
 from database import DB
@@ -98,7 +98,7 @@ class Startup:
         raw = json.loads(msg)
         event, data = raw['event'], raw['data']
 
-        block = Block(data, Source.WEB)
+        block = Block(data)
 
         if event == 'latest_block':
             self.cfg.set('block_latest', block.number)

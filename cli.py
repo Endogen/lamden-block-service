@@ -5,7 +5,7 @@ import typer
 from typing import List
 from loguru import logger
 
-from block import Source
+from block import State
 from sync import Sync
 from config import Config
 from database import DB
@@ -47,7 +47,7 @@ def sync_blocks(block_nums: List[int]):
         for block_num in block_nums:
             block = sync.get_block(block_num)
 
-            if block.source == Source.WEB:
+            if block.exists == State.NEW:
                 sync.process_block(block)
     except Exception as e:
         logger.exception(e)
