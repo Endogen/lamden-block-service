@@ -6,15 +6,10 @@ class InvalidBlockException(Exception):
     pass
 
 
-class Source:
-    DB = 0
-    WEB = 1
-
-
 class Block:
 
-    def __init__(self, content: dict, source: Source):
-        self._source = source
+    def __init__(self, content: dict, exists: bool = False):
+        self._exists = exists
 
         if 'error' in content:
             raise InvalidBlockException(content['error'])
@@ -26,12 +21,8 @@ class Block:
             # Block hash
             self._hash = content['hash']
 
-            # Set valid timestamp for genesis block
-            if content['hlc_timestamp'] == '0000-00-00T00:00:00.000000000Z_0':
-                self._timestamp = '-infinity'
-            else:
-                # HLC timestamp
-                self._timestamp = content['hlc_timestamp'].replace('Z_0', '')
+            # HLC timestamp
+            self._timestamp = content['hlc_timestamp'].replace('Z_0', '')
 
             # Block number
             self._number = int(content['number'])
@@ -124,8 +115,8 @@ class Block:
             raise WrongBlockDataException(repr(e))
 
     @property
-    def source(self) -> Source:
-        return self._source
+    def exists(self) -> bool:
+        return self._exists
 
     @property
     def content(self) -> dict:
