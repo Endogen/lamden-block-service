@@ -10,7 +10,7 @@ from database import DB
 from loguru import logger
 from tgbot import TelegramBot
 from timeit import default_timer as timer
-from block import Block, Source, WrongBlockDataException, InvalidBlockException
+from block import Block, WrongBlockDataException, InvalidBlockException
 
 
 class Sync:
@@ -28,17 +28,6 @@ class Sync:
         start_time = timer()
 
         genesis_block_dir = self.cfg.get('genesis_block_dir')
-
-        # Check if state changes files exist
-        state_changes_list = Path(genesis_block_dir).glob('**/state_changes*.json')
-
-        genesis_block_state = list()
-
-        # Merge state into one list
-        for path in state_changes_list:
-            with open(Path(path)) as f:
-                genesis_block_state += json.load(f)
-
         genesis_block = Path(genesis_block_dir, 'genesis_block.json')
 
         # Check if genesis block file exists
@@ -46,28 +35,42 @@ class Sync:
             logger.error(f'File does not exist: {genesis_block}')
             return
 
-        # Load content of block 0
+        # Load content of genesis block
         with open(Path(genesis_block)) as f:
-            block = json.load(f)
+            block_data = json.load(f)
 
-        # Set state in block
-        block['genesis'] = genesis_block_state
-        block = Block(block, Source.WEB)
+        # Set valid timestamp
+        block_data['hlc_timestamp'] = '-infinity'
+
+        # Save block
+        self.insert_block(Block(block_data))
+        logger.debug(f'-> Saved genesis block - {timer() - start_time:.3f} seconds')
+
+        # Check if state-change files exist
+        state_changes_list = Path(genesis_block_dir).glob('**/state_changes*.json')
+        genesis_block_state = list()
+
+        # Merge state into one list
+        for path in state_changes_list:
+            with open(Path(path)) as f:
+                genesis_block_state += json.load(f)
+
+        # Set state
+        block_data['genesis'] = genesis_block_state
+
+        logger.debug(f'-> Saving genesis block state...')
 
         # Save genesis state in database
-        logger.debug(f'-> Saving genesis block...')
-
-        # TODO
-        self.db.execute(sql.insert_state(),
-                        {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
-                         'cr': block.timestamp, 'up': block.timestamp})
+        for kv in block_data['genesis']:
+            self.db.execute(sql.insert_state(),
+                {'bn': 0, 'k': kv['key'], 'v': json.dumps(kv['value']), 'cr': '-infinity'})
 
         logger.debug(f'-> Saved genesis block - {timer() - start_time:.3f} seconds')
 
         state = dict()
 
         # Create proper dict from state
-        for entry in block['genesis']:
+        for entry in block_data['genesis']:
             state[entry['key']] = entry['value']
 
         logger.debug(f'-> Saving genesis block contracts...')
@@ -75,20 +78,19 @@ class Sync:
         # Identify contracts
         for key, value in state.items():
             if key.endswith('.__code__'):
-                contract_code = value
-                contract_name = key[:key.index('.__code__')]
-                submitted = contract_name + '.__submitted__'
-                contract_submitted = state[submitted]
+                code = value
+                name = key[:key.index('.__code__')]
+                submitted = state[name + '.__submitted__']
 
-                # TODO
+                lst001 = Block.con_is_lst001(code)
+                lst002 = Block.con_is_lst002(code)
+                lst003 = Block.con_is_lst003(code)
+
                 self.db.execute(sql.insert_contract(),
-                    {'bn': block.number, 'n': block.contract, 'c': block.code,
-                    'l1': block.is_lst001, 'l2': block.is_lst002, 'l3': block.is_lst003, 'cr': block.timestamp})
+                    {'bn': 0, 'n': name, 'c': code, 'l1': lst001, 'l2': lst002, 'l3': lst003, 'cr': submitted})
 
-        logger.debug(f'-> Saved genesis block contracts - {timer() - start_time:.3f} seconds')
         logger.debug(f'Finished processing genesis block - {timer() - start_time:.3f} seconds')
 
-    # TODO: Make sure that block 0 can run through this
     def process_block(self, block: Block):
         start_time = timer()
 
@@ -236,7 +238,7 @@ class Sync:
 
         while block:
             # Process if data didn't come from DB
-            if block.source == Source.WEB:
+            if not block.exists:
                 self.process_block(block)
 
             # End sync if current block number is
@@ -270,7 +272,7 @@ class Sync:
 
             if data:
                 logger.debug(f'Retrieved block {block_id} from database')
-                return Block(data[0][2], source=Source.DB)
+                return Block(data[0][2], exists=True)
 
         # Retrieve from web
         for source in self.cfg.get('retrieve_from'):
@@ -290,7 +292,7 @@ class Sync:
                 # Get block from web
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
-                    block = Block(data.json(), source=Source.WEB)
+                    block = Block(data.json())
 
                 return block
 
