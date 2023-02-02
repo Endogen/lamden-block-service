@@ -1,6 +1,7 @@
 import sql
 import json
 import time
+import pytz
 
 import requests as r
 
@@ -9,14 +10,15 @@ from config import Config
 from database import DB
 from loguru import logger
 from tgbot import TelegramBot
+from datetime import datetime
 from timeit import default_timer as timer
-from block import Block, WrongBlockDataException, InvalidBlockException
+from block import Block, InvalidBlockException
 
 
 class Sync:
 
-    cfg = None
     db = None
+    cfg = None
     tgb = None
 
     def __init__(self, config: Config, database: DB, tgbot: TelegramBot):
@@ -48,44 +50,50 @@ class Sync:
 
         # Check if state-change files exist
         state_changes_list = Path(genesis_block_dir).glob('**/state_changes*.json')
-        genesis_block_state = list()
+        genesis_state = list()
 
         # Merge state into one list
         for path in state_changes_list:
             with open(Path(path)) as f:
-                genesis_block_state += json.load(f)
+                logger.debug(f'-> Loading genesis state changes from {path}')
+                genesis_state += json.load(f)
 
-        # Set state
-        block_data['genesis'] = genesis_block_state
+        logger.debug(f'-> Saving genesis state...')
 
-        logger.debug(f'-> Saving genesis block state...')
-
+        # TODO: Comment in again
+        """
         # Save genesis state in database
-        for kv in block_data['genesis']:
+        for kv in genesis_state:
             self.db.execute(sql.insert_state(),
-                {'bn': 0, 'k': kv['key'], 'v': json.dumps(kv['value']), 'cr': '-infinity'})
+                {'bn': 0, 'k': kv['key'], 'v': json.dumps(kv['value']), 'cr': '-infinity', 'up': '-infinity'})
+        """
 
-        logger.debug(f'-> Saved genesis block - {timer() - start_time:.3f} seconds')
+        logger.debug(f'-> Saved genesis state - {timer() - start_time:.3f} seconds')
 
         state = dict()
 
+        logger.debug(f'-> Transforming genesis state...')
+
         # Create proper dict from state
-        for entry in block_data['genesis']:
+        for entry in genesis_state:
             state[entry['key']] = entry['value']
 
-        logger.debug(f'-> Saving genesis block contracts...')
+        logger.debug(f'-> Saving genesis contracts...')
 
         # Identify contracts
         for key, value in state.items():
             if key.endswith('.__code__'):
                 code = value
                 name = key[:key.index('.__code__')]
-                submitted = state[name + '.__submitted__']
+                submitted = state[name + '.__submitted__']['__time__']
+                submitted = datetime(*submitted, tzinfo=pytz.UTC)
 
                 lst001 = Block.con_is_lst001(code)
                 lst002 = Block.con_is_lst002(code)
                 lst003 = Block.con_is_lst003(code)
 
+                # FIXME: Why do i not see errors that happen?
+                # FIXME: Why does it only save 19 contracts?
                 self.db.execute(sql.insert_contract(),
                     {'bn': 0, 'n': name, 'c': code, 'l1': lst001, 'l2': lst002, 'l3': lst003, 'cr': submitted})
 
@@ -205,9 +213,9 @@ class Sync:
         logger.debug(f'Sync job --> Started...')
 
         # If not done yet, sync genesis block
-        if not self.cfg.get('genesis_synced'):
+        if not self.cfg.get('genesis_processed'):
+            self.cfg.set('genesis_processed', True)
             self.process_genesis_block()
-            self.cfg.set('genesis_synced', True)
 
         # Block number to start syncing from
         sync_start = start if start else self.cfg.get('sync_start')
@@ -263,7 +271,7 @@ class Sync:
 
         # Check if block is already in DB
         if check_db:
-            if len(block_id) == 64:
+            if len(str(block_id)) == 64:
                 # 'block_id' is Block Hash
                 data = self.db.execute(sql.select_block_by_hash(), {'bh': block_id})
             else:
@@ -292,18 +300,14 @@ class Sync:
                 # Get block from web
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
-                    block = Block(data.json())
 
-                return block
+                    return Block(data.json())
 
             except InvalidBlockException as e:
                 msg = f'Block {block_id} - invalid: {e}'
                 logger.exception(msg)
-            except WrongBlockDataException as e:
-                msg = f'Block {block_id} - wrong data: {e}'
-                logger.exception(msg)
+                self.tgb.send(msg)
             except Exception as e:
                 msg = f'Block {block_id} - can not retrieve: {e}'
                 logger.exception(msg)
-
-        self.tgb.send(f'Could not retrieve block {block_id}')
+                self.tgb.send(msg)
