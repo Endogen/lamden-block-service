@@ -7,7 +7,7 @@ import json
 import websocket
 import utils
 
-from block import Block, State
+from block import Block
 from tgbot import TelegramBot
 from sync import Sync
 from database import DB
