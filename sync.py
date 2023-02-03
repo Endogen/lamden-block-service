@@ -8,13 +8,15 @@ import requests as r
 from pathlib import Path
 from config import Config
 from database import DB
+from block import Block
 from loguru import logger
 from tgbot import TelegramBot
 from datetime import datetime
 from timeit import default_timer as timer
-from block import Block, InvalidBlockException
+from requests.exceptions import ConnectionError, HTTPError, Timeout, TooManyRedirects, RequestException
 
 
+# TODO: Do i really see errors if they happen?
 class Sync:
 
     db = None
@@ -27,7 +29,7 @@ class Sync:
         self.tgb = tgbot
 
     def process_genesis_block(self):
-        start_time = timer()
+        total_time = timer()
 
         genesis_block_dir = self.cfg.get('genesis_block_dir')
         genesis_block = Path(genesis_block_dir, 'genesis_block.json')
@@ -45,6 +47,7 @@ class Sync:
         block_data['hlc_timestamp'] = '-infinity'
 
         # Save block
+        start_time = timer()
         self.insert_block(Block(block_data))
         logger.debug(f'-> Saved genesis block - {timer() - start_time:.3f} seconds')
 
@@ -55,18 +58,16 @@ class Sync:
         # Merge state into one list
         for path in state_changes_list:
             with open(Path(path)) as f:
-                logger.debug(f'-> Loading genesis state changes from {path}')
+                logger.debug(f'-> Adding genesis state changes from {path}')
                 genesis_state += json.load(f)
 
+        start_time = timer()
         logger.debug(f'-> Saving genesis state...')
 
-        # TODO: Comment in again
-        """
         # Save genesis state in database
         for kv in genesis_state:
             self.db.execute(sql.insert_state(),
                 {'bn': 0, 'k': kv['key'], 'v': json.dumps(kv['value']), 'cr': '-infinity', 'up': '-infinity'})
-        """
 
         logger.debug(f'-> Saved genesis state - {timer() - start_time:.3f} seconds')
 
@@ -78,6 +79,7 @@ class Sync:
         for entry in genesis_state:
             state[entry['key']] = entry['value']
 
+        start_time = timer()
         logger.debug(f'-> Saving genesis contracts...')
 
         # Identify contracts
@@ -92,55 +94,62 @@ class Sync:
                 lst002 = Block.con_is_lst002(code)
                 lst003 = Block.con_is_lst003(code)
 
-                # FIXME: Why do i not see errors that happen?
-                # FIXME: Why does it only save 19 contracts?
                 self.db.execute(sql.insert_contract(),
                     {'bn': 0, 'n': name, 'c': code, 'l1': lst001, 'l2': lst002, 'l3': lst003, 'cr': submitted})
 
-        logger.debug(f'Finished processing genesis block - {timer() - start_time:.3f} seconds')
+        logger.debug(f'-> Saved genesis contracts - {timer() - start_time:.3f} seconds')
+        logger.debug(f'Finished processing genesis block - {timer() - total_time:.3f} seconds')
 
     def process_block(self, block: Block):
-        start_time = timer()
+        total_time = timer()
 
         # SAVE BLOCK
+        start_time = timer()
         self.insert_block(block)
         logger.debug(f'-> Saved block {block.number} - {timer() - start_time:.3f} seconds')
 
         # SAVE TRANSACTION
+        start_time = timer()
         self.insert_tx(block)
         logger.debug(f'-> Saved tx {block.tx_hash} - {timer() - start_time:.3f} seconds')
 
         # SAVE REWARDS
+        start_time = timer()
         self.insert_rewards(block)
         logger.debug(f'-> Saved rewards - {timer() - start_time:.3f} seconds')
 
         # SAVE REWARDS STATE
+        start_time = timer()
         self.insert_state(block, 'rewards')
         logger.debug(f'-> Saved rewards state - {timer() - start_time:.3f} seconds')
 
         if block.tx_is_valid:
 
             # SAVE STATE
+            start_time = timer()
             self.insert_state(block)
             logger.debug(f'-> Saved state - {timer() - start_time:.3f} seconds')
 
             # SAVE ADDRESSES
+            start_time = timer()
             self.insert_address(block)
             logger.debug(f'-> Saved addresses - {timer() - start_time:.3f} seconds')
 
             if block.is_new_contract:
 
                 # SAVE CONTRACT
+                start_time = timer()
                 self.insert_contract(block)
                 logger.debug(f'-> Saved contract {block.contract} - {timer() - start_time:.3f} seconds')
 
         if self.cfg.get('save_blocks_to_file'):
 
             # SAVE BLOCK TO FILE
+            start_time = timer()
             self.save_block_to_file(block)
             logger.debug(f'-> Saved block {block.number} to file - {timer() - start_time:.3f} seconds')
 
-        logger.debug(f'Finished processing block {block.number} - {timer() - start_time:.3f} seconds')
+        logger.debug(f'Finished processing block {block.number} - {timer() - total_time:.3f} seconds')
 
     def insert_block(self, block: Block):
         self.db.execute(sql.insert_block(),
@@ -244,6 +253,7 @@ class Sync:
 
         block = self.get_block(sync_start, check_db=check_db)
 
+        # TODO: Rework logic - block 0 can not be processed because of wrong timestamp but will processed
         while block:
             # Process if data didn't come from DB
             if not block.exists:
@@ -262,7 +272,7 @@ class Sync:
             block = self.get_block(block.prev, check_db=check_db)
 
             # Set sync start to previous block number
-            self.cfg.set('sync_start', block.number)
+            if block: self.cfg.set('sync_start', block.number)
 
         logger.debug(f'Sync job --> Ended after {timer() - start_time:.3f} seconds')
 
@@ -287,13 +297,12 @@ class Sync:
             host = source['host']
             wait = source['wait']
 
+            host = host.replace('{block}', str(block_id))
             logger.debug(f'Retrieving block {block_id} from {host}')
 
             if wait:
                 logger.debug(f'Waiting for {wait} seconds...')
                 time.sleep(wait)
-
-            host = host.replace('{block}', str(block_id))
 
             try:
 
@@ -301,13 +310,16 @@ class Sync:
                 with r.get(host) as data:
                     logger.info(f'Block {block_id} --> {data.text}')
 
+                    if 'error' in data.json():
+                        # Block Service does not know block
+                        logger.debug(f'Block {block_id} unknown - trying next host...')
+                        continue
+
                     return Block(data.json())
 
-            except InvalidBlockException as e:
-                msg = f'Block {block_id} - invalid: {e}'
-                logger.exception(msg)
-                self.tgb.send(msg)
-            except Exception as e:
-                msg = f'Block {block_id} - can not retrieve: {e}'
-                logger.exception(msg)
-                self.tgb.send(msg)
+            except (ConnectionError, HTTPError, Timeout, TooManyRedirects, RequestException) as e:
+                logger.error(f'Can not retrieve Block {block_id}: {repr(e)}')
+                self.tgb.send(f'‼️ Block Sync Error: {e}')
+
+        logger.error(f'Block {block_id} could not be retrieved! Tried all hosts.')
+        self.tgb.send(f'‼️ Block Sync Error: No host able to deliver block')
