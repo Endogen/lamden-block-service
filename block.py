@@ -1,7 +1,3 @@
-class InvalidBlockException(Exception):
-    pass
-
-
 class Block:
 
     def __init__(self, content: dict, exists: bool = False):
@@ -10,9 +6,6 @@ class Block:
 
         # Block exists in DB?
         self._exists = exists
-
-        if 'error' in content:
-            raise InvalidBlockException(content['error'])
 
         # Block hash
         self._hash = content['hash']
