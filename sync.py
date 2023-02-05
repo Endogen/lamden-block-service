@@ -123,6 +123,11 @@ class Sync:
         self.insert_state(block, 'rewards')
         logger.debug(f'-> Saved rewards state - {timer() - start_time:.3f} seconds')
 
+        # SAVE TAU BALANCE OF SENDER (TX FEE REDUCTION)
+        start_time = timer()
+        self.insert_sender_balance(block)
+        logger.debug(f'-> Saved sender balance - {timer() - start_time:.3f} seconds')
+
         if block.tx_is_valid:
 
             # SAVE STATE
@@ -166,6 +171,22 @@ class Sync:
                 'r': json.dumps(rw['reward']), 'cr': block.timestamp})
 
             logger.trace(f'-> Reward {rw["key"]} saved')
+
+    def insert_sender_balance(self, block: Block):
+        for kv in block.state:
+            if kv['key'] == f'currency.balances:{block.sender}':
+                # Check if state is already known and newer than current data
+                data = self.db.execute(sql.select_raw_state(), {'k': kv['key']})
+
+                if data and data[0] and data[0][0] and data[0][0]['block_num'] > block.number:
+                    logger.trace(f'-> State {kv["key"]} skipped - newer present')
+                    continue
+
+                self.db.execute(sql.insert_state(),
+                    {'bn': block.number, 'k': kv['key'], 'v': json.dumps(kv['value']),
+                    'cr': block.timestamp, 'up': block.timestamp})
+
+                logger.trace(f'-> State {kv["key"]} saved')
 
     def insert_state(self, block: Block, state: str = 'state'):
         if state.lower() == 'state':
