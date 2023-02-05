@@ -60,6 +60,8 @@ class Block:
             # Check FROM address
             if self.is_valid_address(pld['sender']):
                 self._addresses.add(pld['sender'])
+                # Save sender address
+                self._sender = pld['sender']
             # Check TO address (if it exists)
             if 'kwargs' in pld and 'to' in pld['kwargs']:
                 if self.is_valid_address(pld['kwargs']['to']):
@@ -139,6 +141,10 @@ class Block:
     @property
     def result(self) -> str:
         return self._result
+
+    @property
+    def sender(self) -> str:
+        return self._sender
 
     @property
     def state(self) -> list:
