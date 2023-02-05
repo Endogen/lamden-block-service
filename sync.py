@@ -253,10 +253,9 @@ class Sync:
 
         block = self.get_block(sync_start, check_db=check_db)
 
-        # TODO: Rework logic - block 0 can not be processed because of wrong timestamp but will processed
         while block:
             # Process if data didn't come from DB
-            if not block.exists:
+            if not block.exists and not block.number == 0:
                 self.process_block(block)
 
             # End sync if current block number is
