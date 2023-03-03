@@ -237,6 +237,10 @@ class Sync:
         with open(block_file, 'w', encoding='utf-8') as f:
             json.dump(block.content, f, sort_keys=True, indent=4)
 
+    # FIXME: Looks like the second sync that happens has wrong sync_start value and maybe also sync_end value
+    # After fully synced, sync_start should be None and thus
+    # TODO: Will probably need a `persist` argument that will need to be False for API executions and that
+    # will not save sync_start and sync_end
     def sync(self, start: int = None, end: int = None, check_db: bool = True):
         start_time = timer()
 
@@ -272,6 +276,8 @@ class Sync:
             self.tgb.send(msg)
             return
 
+        logger.debug(f'Sync from {sync_start} to {sync_end}')
+
         block = self.get_block(sync_start, check_db=check_db)
 
         while block:
@@ -284,15 +290,19 @@ class Sync:
             if block.number in (sync_end, 0):
                 # New sync end is previous sync start
                 self.cfg.set('sync_end', sync_start)
+                logger.debug(f'Set sync_end to {sync_start}')
                 # New sync start will be block_latest
                 self.cfg.set('sync_start', None)
+                logger.debug(f'Set sync_start to {None}')
                 break
 
             # Get previous block
             block = self.get_block(block.prev, check_db=check_db)
 
             # Set sync start to previous block number
-            if block: self.cfg.set('sync_start', block.number)
+            if block:
+                self.cfg.set('sync_start', block.number)
+                logger.debug(f'Set sync_start to {block.number}')
 
         logger.debug(f'Sync job --> Ended after {timer() - start_time:.3f} seconds')
 
