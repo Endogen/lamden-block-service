@@ -16,7 +16,7 @@ Install necessary packages
 Add the repository that provides PostgreSQL 14 on Ubuntu 20.04|18.04
 `sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'`
 
-Iport the GPG signing key for the repository
+Import the GPG signing key for the repository
 `wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -`
 
 Update package list
